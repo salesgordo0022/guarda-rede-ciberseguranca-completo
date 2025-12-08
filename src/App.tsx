@@ -27,6 +27,7 @@ import ProjectDetail from "./pages/ProjectDetail";
 
 // Importações de componentes personalizados
 import ErrorBoundary from "@/components/ErrorBoundary";
+import { LoginBar } from "@/components/LoginBar";
 
 // Cliente para gerenciamento de consultas assíncronas
 const queryClient = new QueryClient();
@@ -52,7 +53,7 @@ const ThemeApplicator = () => {
 
     // Forçar atualização do esquema de cores do documento
     root.style.colorScheme = theme.name === 'dark' || theme.name === 'black' ? 'dark' : 'light';
-  }, [theme]); // Dependência: reexecutar quando o tema mudar
+  }, [theme]);
 
   // Componente não renderiza nada visualmente
   return null;
@@ -88,6 +89,7 @@ const App = () => (
             <Toaster />
             <Sonner />
             <ThemeApplicator />
+            <LoginBar />
             <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
               <Routes>
                 <Route path="/auth" element={<Auth />} />

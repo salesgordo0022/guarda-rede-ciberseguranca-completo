@@ -28,6 +28,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
+import { ProjectActivitiesTable } from "@/components/ProjectActivitiesTable";
 
 interface Project {
   id: string;
@@ -193,6 +194,45 @@ const ProjectDetail = () => {
     } catch (error) {
       toast.error("Erro ao criar atividade: " + (error as Error).message);
     }
+  };
+
+  const handleUpdateActivity = async (data: Partial<ProjectActivity> & { id: string }) => {
+    try {
+      const { error } = await supabase
+        .from("project_activities")
+        .update(data)
+        .eq("id", data.id);
+
+      if (error) throw error;
+
+      toast.success("Atividade atualizada com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ["project-activities", projectId] });
+    } catch (error) {
+      toast.error("Erro ao atualizar atividade: " + (error as Error).message);
+    }
+  };
+
+  const handleDeleteActivity = async (id: string) => {
+    if (!confirm("Tem certeza que deseja excluir esta atividade?")) return;
+
+    try {
+      const { error } = await supabase
+        .from("project_activities")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+
+      toast.success("Atividade excluída com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ["project-activities", projectId] });
+    } catch (error) {
+      toast.error("Erro ao excluir atividade: " + (error as Error).message);
+    }
+  };
+
+  const handleEditActivity = (activity: ProjectActivity) => {
+    // For now, we'll just show a toast. In a real implementation, you might open an edit dialog.
+    toast.info("Funcionalidade de edição em desenvolvimento");
   };
 
   const calculateScheduleStatus = (deadline: string | null, scheduleEnd: string | null) => {
@@ -593,90 +633,16 @@ const ProjectDetail = () => {
             </Card>
           ))}
         </div>
-      ) : filteredActivities.length === 0 ? (
-        <Card className="p-12 text-center">
-          <div className="space-y-3">
-            <div className="text-2xl font-bold">Nenhuma atividade encontrada</div>
-            <p className="text-muted-foreground">
-              {searchQuery 
-                ? "Nenhuma atividade corresponde à sua busca" 
-                : "Comece criando sua primeira atividade para este projeto"}
-            </p>
-            {(isAdmin || isGestor) && !searchQuery && (
-              <Button 
-                onClick={() => setIsCreateActivityDialogOpen(true)}
-                className="mt-4"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Criar Primeira Atividade
-              </Button>
-            )}
-          </div>
-        </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredActivities.map((activity) => (
-            <Card key={activity.id} className="hover:shadow-lg transition-all">
-              <CardHeader>
-                <CardTitle className="flex items-start justify-between">
-                  <span className="truncate">{activity.title}</span>
-                  <Badge className={getActivityPriorityColor(activity.priority)}>
-                    {activity.priority}
-                  </Badge>
-                </CardTitle>
-                <CardDescription className="line-clamp-2">
-                  {activity.description || "Sem descrição"}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <User className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">
-                    {activity.responsible 
-                      ? profiles.find(p => p.id === activity.responsible)?.full_name || "Desconhecido"
-                      : "Sem responsável"}
-                  </span>
-                </div>
-                
-                <div className="flex items-center gap-2 text-sm">
-                  <Building2 className="h-4 w-4 text-muted-foreground" />
-                  <div className="flex flex-wrap gap-1">
-                    {activity.department_ids && activity.department_ids.length > 0 ? (
-                      activity.department_ids.map((deptId) => {
-                        const dept = departments.find(d => d.id === deptId);
-                        return dept ? (
-                          <Badge key={deptId} variant="secondary" className="text-xs">
-                            {dept.name}
-                          </Badge>
-                        ) : null;
-                      })
-                    ) : (
-                      <span className="text-muted-foreground">Nenhum departamento</span>
-                    )}
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-2 text-sm">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">
-                    {activity.deadline 
-                      ? new Date(activity.deadline).toLocaleDateString("pt-BR")
-                      : "Sem prazo"}
-                  </span>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <Badge className={getActivityStatusColor(activity.status)}>
-                    {activity.status}
-                  </Badge>
-                  {activity.schedule_status === "Atrasado" && (
-                    <Badge variant="destructive">Atrasado</Badge>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <ProjectActivitiesTable
+          activities={filteredActivities}
+          isLoading={isActivitiesLoading}
+          departments={departments}
+          profiles={profiles}
+          onUpdateActivity={handleUpdateActivity}
+          onDeleteActivity={handleDeleteActivity}
+          onEditActivity={handleEditActivity}
+        />
       )}
     </div>
   );

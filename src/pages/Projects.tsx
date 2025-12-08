@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { ProjectActivitiesTable } from "@/components/ProjectActivitiesTable";
 
 interface Project {
   id: string;
@@ -216,6 +217,7 @@ const Projects = () => {
               <Kanban className="h-4 w-4" />
               Kanban
             </Button>
+
           </div>
 
           <div className="relative flex-1">

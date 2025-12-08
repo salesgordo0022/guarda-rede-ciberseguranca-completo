@@ -1,8 +1,25 @@
 // Banco de dados local simples usando localStorage. Suporta select/insert/update/delete com filtros encadeados.
 
-type Row = Record<string, any>;
+type Row = Record<string, string | number | boolean | null | undefined | Date | object>;
+
+interface UserSession {
+  user: {
+    id: string;
+    email: string;
+    aud: string;
+    role: string;
+    created_at: string;
+  };
+  expires_at: number;
+}
+
+interface QueryResult<T> {
+  data: T | T[] | null;
+  error: { message: string } | null;
+}
 
 const DB_KEY = "mtv_local_db";
+const AUTH_KEY = "mtv_local_auth_session";
 
 type Tables = {
   companies: Row[];
@@ -10,6 +27,8 @@ type Tables = {
   profiles: Row[];
   tasks: Row[];
   task_assignees: Row[];
+  task_history: Row[];
+  task_comments: Row[];
   // Suporte legado se necessário
   activities: Row[];
   sub_activities: Row[];
@@ -45,6 +64,8 @@ function readDB(): Tables {
     ],
     tasks: [],
     task_assignees: [],
+    task_history: [],
+    task_comments: [],
     activities: [],
     sub_activities: [],
     processes: [],
@@ -212,6 +233,140 @@ function readDB(): Tables {
             has_fine: false,
             created_at: today,
             created_by: 'local-user'
+          },
+          // Novos dados mocados adicionados
+          {
+            id: crypto.randomUUID(),
+            company_id: 'company-1',
+            department_id: 'dept-2',
+            title: "Relatório Financeiro Mensal",
+            description: "Preparar relatório financeiro para diretoria",
+            responsible: "Admin Local",
+            status: "Em andamento",
+            priority: "alta",
+            deadline: new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0], // In 2 days
+            schedule_start: today,
+            schedule_end: new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0], // In 2 days
+            schedule_status: "Dentro do prazo",
+            has_fine: false,
+            created_at: yesterday,
+            created_by: 'local-user'
+          },
+          {
+            id: crypto.randomUUID(),
+            company_id: 'company-1',
+            department_id: 'dept-3',
+            title: "Atualização de Segurança",
+            description: "Aplicar patches de segurança nos servidores",
+            responsible: "Colaborador TI",
+            status: "Não iniciado",
+            priority: "urgente",
+            deadline: today,
+            schedule_start: today,
+            schedule_end: new Date(Date.now() + 86400000).toISOString().split('T')[0], // Tomorrow
+            schedule_status: "Dentro do prazo",
+            has_fine: true,
+            fine_amount: 500.00,
+            fine_reason: "Atraso na atualização de segurança",
+            created_at: today,
+            created_by: 'local-user'
+          },
+          {
+            id: crypto.randomUUID(),
+            company_id: 'company-1',
+            department_id: 'dept-1',
+            title: "Campanha Publicitária",
+            description: "Desenvolver nova campanha para redes sociais",
+            responsible: "Gestor Comercial",
+            status: "Parado",
+            priority: "média",
+            deadline: new Date(Date.now() - 86400000).toISOString().split('T')[0], // Yesterday (overdue)
+            schedule_start: new Date(Date.now() - 3 * 86400000).toISOString().split('T')[0], // 3 days ago
+            schedule_end: new Date(Date.now() - 86400000).toISOString().split('T')[0], // Yesterday
+            schedule_status: "Atrasado",
+            has_fine: false,
+            created_at: new Date(Date.now() - 3 * 86400000).toISOString().split('T')[0],
+            created_by: 'local-user'
+          },
+          {
+            id: crypto.randomUUID(),
+            company_id: 'company-1',
+            department_id: 'dept-3',
+            title: "Treinamento de Equipe",
+            description: "Treinamento sobre novas ferramentas de desenvolvimento",
+            responsible: "Colaborador TI",
+            status: "Em andamento",
+            priority: "baixa",
+            deadline: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0], // In 1 week
+            schedule_start: today,
+            schedule_end: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0], // In 1 week
+            schedule_status: "Dentro do prazo",
+            has_fine: false,
+            created_at: today,
+            created_by: 'local-user'
+          },
+          {
+            id: crypto.randomUUID(),
+            company_id: 'company-1',
+            department_id: 'dept-2',
+            title: "Auditoria Interna",
+            description: "Realizar auditoria dos processos financeiros",
+            responsible: "Admin Local",
+            status: "Não iniciado",
+            priority: "alta",
+            deadline: new Date(Date.now() + 10 * 86400000).toISOString().split('T')[0], // In 10 days
+            schedule_start: new Date(Date.now() + 5 * 86400000).toISOString().split('T')[0], // In 5 days
+            schedule_end: new Date(Date.now() + 10 * 86400000).toISOString().split('T')[0], // In 10 days
+            schedule_status: "Dentro do prazo",
+            has_fine: false,
+            created_at: today,
+            created_by: 'local-user'
+          }
+        ];
+      }
+
+      // Popular histórico de tarefas se estiver vazio
+      if (!merged.task_history || merged.task_history.length === 0) {
+        const taskId = merged.tasks[0]?.id || 'task-1';
+        merged.task_history = [
+          {
+            id: crypto.randomUUID(),
+            task_id: taskId,
+            user_id: 'local-user',
+            action: 'criada',
+            old_values: null,
+            new_values: { status: 'Não iniciado' },
+            created_at: new Date(Date.now() - 3600000).toISOString() // 1 hour ago
+          },
+          {
+            id: crypto.randomUUID(),
+            task_id: taskId,
+            user_id: 'local-user',
+            action: 'atualizada',
+            old_values: { status: 'Não iniciado' },
+            new_values: { status: 'Em andamento' },
+            created_at: new Date().toISOString()
+          }
+        ];
+      }
+
+      // Popular comentários de tarefas se estiver vazio
+      if (!merged.task_comments || merged.task_comments.length === 0) {
+        const taskId = merged.tasks[0]?.id || 'task-1';
+        merged.task_comments = [
+          {
+            id: crypto.randomUUID(),
+            task_id: taskId,
+            user_id: 'local-user',
+            comment: 'Iniciando trabalho nesta tarefa hoje.',
+            created_at: new Date(Date.now() - 1800000).toISOString() // 30 minutes ago
+          },
+          {
+            id: crypto.randomUUID(),
+            task_id: taskId,
+            user_id: 'user-2',
+            comment: 'Precisamos finalizar isso até amanhã.',
+            created_at: new Date(Date.now() - 1200000).toISOString() // 20 minutes ago
           }
         ];
       }
@@ -238,7 +393,7 @@ function getTable<T extends keyof Tables>(table: T): Tables[T] {
 
 function setTable<T extends keyof Tables>(table: T, rows: Tables[T]) {
   const db = readDB();
-  db[table] = rows as any;
+  db[table] = rows;
   writeDB(db);
 }
 
@@ -250,7 +405,7 @@ class MockQueryBuilder {
   private _limit: number | null = null;
   private _single: boolean = false;
   private _select: string | undefined;
-  private _insertData: any = null;
+  private _insertData: Row | Row[] | null = null;
 
   constructor(table: keyof Tables) {
     this.table = table;
@@ -261,55 +416,67 @@ class MockQueryBuilder {
     return this;
   }
 
-  insert(data: any) {
+  insert(data: Row | Row[]) {
     this._insertData = data;
     return this;
   }
 
   // Filtros
-  eq(column: string, value: any) {
+  eq(column: string, value: string | number | boolean | null | undefined) {
     this.filters.push(row => row[column] == value); // Igualdade flexível para correspondência de números/strings
     return this;
   }
 
-  neq(column: string, value: any) {
+  neq(column: string, value: string | number | boolean | null | undefined) {
     this.filters.push(row => row[column] != value);
     return this;
   }
 
-  gt(column: string, value: any) {
+  gt(column: string, value: string | number | boolean | null | undefined) {
     this.filters.push(row => row[column] > value);
     return this;
   }
 
-  gte(column: string, value: any) {
+  gte(column: string, value: string | number | boolean | null | undefined) {
     this.filters.push(row => row[column] >= value);
     return this;
   }
 
-  lt(column: string, value: any) {
+  lt(column: string, value: string | number | boolean | null | undefined) {
     this.filters.push(row => row[column] < value);
     return this;
   }
 
-  lte(column: string, value: any) {
+  lte(column: string, value: string | number | boolean | null | undefined) {
     this.filters.push(row => row[column] <= value);
     return this;
   }
 
-  in(column: string, values: any[]) {
-    this.filters.push(row => values.includes(row[column]));
+  in(column: string, values: (string | number | boolean | null | undefined)[]) {
+    this.filters.push(row => {
+      const rowValue = row[column];
+      // Handle primitive types
+      if (typeof rowValue !== 'object' || rowValue === null) {
+        return values.includes(rowValue as string | number | boolean | null | undefined);
+      }
+      // Handle object types (like Date)
+      return values.some(v => 
+        v !== null && v !== undefined && 
+        typeof v === 'object' && 
+        JSON.stringify(rowValue) === JSON.stringify(v)
+      );
+    });
     return this;
   }
 
-  is(column: string, value: any) {
+  is(column: string, value: string | number | boolean | null | undefined) {
     this.filters.push(row => row[column] === value);
     return this;
   }
 
   like(column: string, pattern: string) {
     const regex = new RegExp(pattern.replace(/%/g, '.*'), 'i');
-    this.filters.push(row => regex.test(row[column]));
+    this.filters.push(row => typeof row[column] === 'string' && regex.test(row[column] as string));
     return this;
   }
 
@@ -328,7 +495,7 @@ class MockQueryBuilder {
         if (op === 'eq') return row[col] == val;
         if (op === 'ilike' || op === 'like') {
           const regex = new RegExp(val.replace(/%/g, '.*'), 'i');
-          return regex.test(row[col]);
+          return typeof row[col] === 'string' && regex.test(row[col] as string);
         }
         return false;
       });
@@ -352,7 +519,10 @@ class MockQueryBuilder {
   }
 
   // Execução
-  async then(resolve: (res: { data: any; error: any }) => void, reject: (err: any) => void) {
+  async then(
+    resolve: (res: { data: Row | Row[] | null; error: { message: string } | null }) => void, 
+    reject: (err: { message: string }) => void
+  ) {
     try {
       // Handle insert operation
       if (this._insertData) {
@@ -363,18 +533,18 @@ class MockQueryBuilder {
         const newData = Array.isArray(this._insertData) 
           ? this._insertData.map(item => ({
             ...item,
-            id: item.id || crypto.randomUUID(),
-            created_at: item.created_at || new Date().toISOString(),
-            updated_at: item.updated_at || new Date().toISOString()
+            id: (item.id as string) || crypto.randomUUID(),
+            created_at: (item.created_at as string) || new Date().toISOString(),
+            updated_at: (item.updated_at as string) || new Date().toISOString()
           }))
           : [{
             ...this._insertData,
-            id: this._insertData.id || crypto.randomUUID(),
-            created_at: this._insertData.created_at || new Date().toISOString(),
-            updated_at: this._insertData.updated_at || new Date().toISOString()
+            id: (this._insertData.id as string) || crypto.randomUUID(),
+            created_at: (this._insertData.created_at as string) || new Date().toISOString(),
+            updated_at: (this._insertData.updated_at as string) || new Date().toISOString()
           }];
         
-        db[this.table] = [...tableData, ...newData];
+        db[this.table] = [...tableData, ...newData] as Tables[keyof Tables];
         writeDB(db);
         
         resolve({ data: Array.isArray(this._insertData) ? newData : newData[0], error: null });
@@ -410,8 +580,9 @@ class MockQueryBuilder {
       } else {
         resolve({ data, error: null });
       }
-    } catch (e: any) {
-      resolve({ data: null, error: { message: e.message } });
+    } catch (e: unknown) {
+      const error = e as { message: string };
+      resolve({ data: null, error: { message: error.message } });
     }
   }
 
@@ -419,7 +590,7 @@ class MockQueryBuilder {
     if (!this._select || this._select === '*') return rows;
 
     return rows.map(row => {
-      const newRow: any = {};
+      const newRow: Row = {} as Row;
 
       // Seleção básica de colunas
       if (this._select?.includes('*')) {
@@ -456,22 +627,30 @@ class MockQueryBuilder {
   }
 }
 
+function readSession() {
+  const raw = localStorage.getItem(AUTH_KEY);
+  return raw ? JSON.parse(raw) : null;
+}
+
+function writeSession(session: UserSession | null) {
+  if (session) localStorage.setItem(AUTH_KEY, JSON.stringify(session));
+  else localStorage.removeItem(AUTH_KEY);
+}
+
 export function createMockClient() {
-  const AUTH_KEY = "mtv_local_auth_session";
-
-  function readSession() {
-    const raw = localStorage.getItem(AUTH_KEY);
-    return raw ? JSON.parse(raw) : null;
-  }
-
-  function writeSession(session: any | null) {
-    if (session) localStorage.setItem(AUTH_KEY, JSON.stringify(session));
-    else localStorage.removeItem(AUTH_KEY);
-  }
-
-  // Garantir sessão padrão
+  // Garantir sessão padrão para ambiente de desenvolvimento
   if (!readSession()) {
-    writeSession({ user: { id: 'local-user', email: 'admin@gclick.com' } });
+    const session: UserSession = { 
+      user: { 
+        id: 'local-user', 
+        email: 'admin@gclick.com',
+        aud: 'authenticated',
+        role: 'authenticated',
+        created_at: new Date().toISOString()
+      },
+      expires_at: Math.floor(Date.now() / 1000) + 3600 // 1 hour from now
+    };
+    writeSession(session);
   }
 
   return {
@@ -479,23 +658,46 @@ export function createMockClient() {
       return new MockQueryBuilder(table);
     },
     auth: {
-      getSession: async () => ({ data: { session: readSession() }, error: null }),
-      onAuthStateChange: (cb: any) => {
-        cb('SIGNED_IN', readSession());
+      getSession: async () => {
+        const session = readSession();
+        return { data: { session }, error: null };
+      },
+      onAuthStateChange: (cb: (event: string, session: UserSession | null) => void) => {
+        // Immediately call with current session state
+        const session = readSession();
+        cb('SIGNED_IN', session);
         return { data: { subscription: { unsubscribe: () => { } } } };
       },
-      signInWithPassword: async ({ email }: any) => {
+      signInWithPassword: async ({ email }: { email: string }) => {
         // Login mock - encontrar usuário por email
         const profiles = getTable('profiles');
         const user = profiles.find(p => p.email === email);
         if (user) {
-          const session = { user: { id: user.id, email: user.email } };
+          const session: UserSession = { 
+            user: { 
+              id: user.id as string, 
+              email: user.email as string,
+              aud: 'authenticated',
+              role: 'authenticated',
+              created_at: new Date().toISOString()
+            },
+            expires_at: Math.floor(Date.now() / 1000) + 3600 // 1 hour from now
+          };
           writeSession(session);
           return { data: { session }, error: null };
         }
         // Alternativa para usuário local padrão
         if (email === 'admin@gclick.com') {
-          const session = { user: { id: 'local-user', email } };
+          const session: UserSession = { 
+            user: { 
+              id: 'local-user', 
+              email,
+              aud: 'authenticated',
+              role: 'authenticated',
+              created_at: new Date().toISOString()
+            },
+            expires_at: Math.floor(Date.now() / 1000) + 3600 // 1 hour from now
+          };
           writeSession(session);
           return { data: { session }, error: null };
         }
