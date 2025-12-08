@@ -52,9 +52,9 @@ const Auth = () => {
         if (error) throw error;
         toast.success("Conta criada com sucesso! Você já pode fazer login.");
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Erro de autenticação:", error);
-      toast.error(error.message || "Erro ao autenticar");
+      toast.error((error as Error).message || "Erro ao autenticar");
     } finally {
       setLoading(false);
     }

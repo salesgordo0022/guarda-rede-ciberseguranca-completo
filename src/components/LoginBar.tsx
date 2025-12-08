@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useLocation } from "react-router-dom";
 
 interface LoginBarProps {
   onLoginSuccess?: () => void;
@@ -17,15 +18,18 @@ export const LoginBar = ({ onLoginSuccess }: LoginBarProps) => {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
-  const [isVisible, setIsVisible] = useState(true);
   const { session } = useAuth();
+  const location = useLocation();
 
-  useEffect(() => {
-    // Auto-hide if user is already logged in
-    if (session) {
-      setIsVisible(false);
-    }
-  }, [session]);
+  // Não mostrar o LoginBar na página de autenticação
+  if (location.pathname === "/auth") {
+    return null;
+  }
+
+  // Esconder o LoginBar se o usuário já estiver logado
+  if (session) {
+    return null;
+  }
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,17 +69,8 @@ export const LoginBar = ({ onLoginSuccess }: LoginBarProps) => {
     }
   };
 
-  const toggleVisibility = () => {
-    setIsVisible(!isVisible);
-  };
-
-  // When not visible, we don't show any button since Tutorial component handles this
-  if (!isVisible) {
-    return null;
-  }
-
   return (
-    <div className={`fixed bottom-4 right-4 z-50 w-full max-w-md animate-slide-in-right ${!isVisible ? 'hidden' : ''}`}>
+    <div className="fixed bottom-4 right-4 z-50 w-full max-w-md animate-slide-in-right">
       <Card className="shadow-2xl border-border">
         <CardHeader className="pb-3">
           <div className="flex justify-between items-center">
@@ -87,14 +82,6 @@ export const LoginBar = ({ onLoginSuccess }: LoginBarProps) => {
                 {isLogin ? "Entre com suas credenciais" : "Registre-se para começar"}
               </CardDescription>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={toggleVisibility}
-              className="h-8 w-8 p-0 hover-scale"
-            >
-              ×
-            </Button>
           </div>
         </CardHeader>
         <CardContent>

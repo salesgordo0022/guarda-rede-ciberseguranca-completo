@@ -120,7 +120,6 @@ const App = () => {
               <Toaster />
               <Sonner />
               <ThemeApplicator />
-              <LoginBar />
               <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
                 <Routes>
                   <Route path="/auth" element={<Auth />} />
@@ -129,6 +128,7 @@ const App = () => {
                     element={
                       <ProtectedRoute>
                         <div className="relative min-h-screen flex w-full">
+                          <LoginBar />
                           <SidebarProvider>
                             <div className="flex w-full">
                               <AppSidebar />
@@ -155,15 +155,15 @@ const App = () => {
                                 </Routes>
                               </main>
                             </div>
+                            <div className="fixed bottom-4 right-4 z-50">
+                              <Tutorial />
+                            </div>
                           </SidebarProvider>
                         </div>
                       </ProtectedRoute>
                     }
                   />
                 </Routes>
-                <div className="fixed bottom-4 right-4 z-50">
-                  <Tutorial />
-                </div>
               </BrowserRouter>
             </ErrorBoundary>
           </TooltipProvider>
