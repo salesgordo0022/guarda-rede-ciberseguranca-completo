@@ -37,10 +37,12 @@ const Auth = () => {
         if (error) throw error;
         // O redirecionamento será tratado pelo useEffect quando a sessão mudar
       } else {
+        const redirectUrl = `${window.location.origin}/`;
         const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
+            emailRedirectTo: redirectUrl,
             data: {
               full_name: fullName,
             },
@@ -48,7 +50,7 @@ const Auth = () => {
         });
 
         if (error) throw error;
-        toast.success("Verifique seu email para confirmar o cadastro!");
+        toast.success("Conta criada com sucesso! Você já pode fazer login.");
       }
     } catch (error: any) {
       console.error("Erro de autenticação:", error);

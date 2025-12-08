@@ -81,11 +81,14 @@ export function AppSidebar() {
 
   const handleCreateCompany = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCompanyName.trim()) return;
+    if (!newCompanyName.trim() || !profile?.id) return;
 
     const { data, error } = await supabase
       .from('companies')
-      .insert({ name: newCompanyName })
+      .insert({ 
+        name: newCompanyName,
+        created_by: profile.id
+      })
       .select()
       .single();
 

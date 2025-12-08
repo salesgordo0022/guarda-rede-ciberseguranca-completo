@@ -14,46 +14,92 @@ export type Database = {
   }
   public: {
     Tables: {
-      activities: {
+      companies: {
         Row: {
-          cancellation_type: string | null
-          created_at: string | null
-          created_by: string | null
-          department_id: string | null
+          cnpj: string | null
+          created_at: string
+          created_by: string
           description: string | null
           id: string
-          order_index: number
-          requires_justification: boolean | null
-          title: string
-          updated_at: string | null
+          logo_url: string | null
+          name: string
+          updated_at: string
         }
         Insert: {
-          cancellation_type?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          department_id?: string | null
+          cnpj?: string | null
+          created_at?: string
+          created_by: string
           description?: string | null
           id?: string
-          order_index?: number
-          requires_justification?: boolean | null
-          title: string
-          updated_at?: string | null
+          logo_url?: string | null
+          name: string
+          updated_at?: string
         }
         Update: {
-          cancellation_type?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          department_id?: string | null
+          cnpj?: string | null
+          created_at?: string
+          created_by?: string
           description?: string | null
           id?: string
-          order_index?: number
-          requires_justification?: boolean | null
-          title?: string
-          updated_at?: string | null
+          logo_url?: string | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      department_activities: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          created_by: string
+          deadline: string | null
+          deadline_status: Database["public"]["Enums"]["deadline_status"] | null
+          department_id: string
+          description: string | null
+          id: string
+          name: string
+          order_index: number | null
+          scheduled_date: string | null
+          status: Database["public"]["Enums"]["activity_status"] | null
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          created_by: string
+          deadline?: string | null
+          deadline_status?:
+            | Database["public"]["Enums"]["deadline_status"]
+            | null
+          department_id: string
+          description?: string | null
+          id?: string
+          name: string
+          order_index?: number | null
+          scheduled_date?: string | null
+          status?: Database["public"]["Enums"]["activity_status"] | null
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string
+          deadline?: string | null
+          deadline_status?:
+            | Database["public"]["Enums"]["deadline_status"]
+            | null
+          department_id?: string
+          description?: string | null
+          id?: string
+          name?: string
+          order_index?: number | null
+          scheduled_date?: string | null
+          status?: Database["public"]["Enums"]["activity_status"] | null
+          updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "activities_department_id_fkey"
+            foreignKeyName: "department_activities_department_id_fkey"
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "departments"
@@ -61,215 +107,164 @@ export type Database = {
           },
         ]
       }
-      activity_completions: {
+      department_activity_assignees: {
         Row: {
-          activity_id: string | null
-          completed_at: string | null
+          activity_id: string
+          created_at: string
           id: string
-          process_activity_id: string | null
-          user_id: string | null
+          user_id: string
         }
         Insert: {
-          activity_id?: string | null
-          completed_at?: string | null
+          activity_id: string
+          created_at?: string
           id?: string
-          process_activity_id?: string | null
-          user_id?: string | null
+          user_id: string
         }
         Update: {
-          activity_id?: string | null
-          completed_at?: string | null
+          activity_id?: string
+          created_at?: string
           id?: string
-          process_activity_id?: string | null
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "activity_completions_activity_id_fkey"
+            foreignKeyName: "department_activity_assignees_activity_id_fkey"
             columns: ["activity_id"]
             isOneToOne: false
-            referencedRelation: "activities"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "activity_completions_process_activity_id_fkey"
-            columns: ["process_activity_id"]
-            isOneToOne: false
-            referencedRelation: "process_activities"
+            referencedRelation: "department_activities"
             referencedColumns: ["id"]
           },
         ]
       }
       departments: {
         Row: {
-          created_at: string | null
+          color: string | null
+          company_id: string
+          created_at: string
+          created_by: string
           description: string | null
           id: string
           name: string
-          updated_at: string | null
+          updated_at: string
         }
         Insert: {
-          created_at?: string | null
+          color?: string | null
+          company_id: string
+          created_at?: string
+          created_by: string
           description?: string | null
           id?: string
           name: string
-          updated_at?: string | null
+          updated_at?: string
         }
         Update: {
-          created_at?: string | null
+          color?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string
           description?: string | null
           id?: string
           name?: string
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      process_activities: {
-        Row: {
-          activity_id: string | null
-          completed_at: string | null
-          created_at: string | null
-          id: string
-          is_completed: boolean | null
-          order_index: number
-          process_id: string | null
-        }
-        Insert: {
-          activity_id?: string | null
-          completed_at?: string | null
-          created_at?: string | null
-          id?: string
-          is_completed?: boolean | null
-          order_index: number
-          process_id?: string | null
-        }
-        Update: {
-          activity_id?: string | null
-          completed_at?: string | null
-          created_at?: string | null
-          id?: string
-          is_completed?: boolean | null
-          order_index?: number
-          process_id?: string | null
+          updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "process_activities_activity_id_fkey"
-            columns: ["activity_id"]
+            foreignKeyName: "departments_company_id_fkey"
+            columns: ["company_id"]
             isOneToOne: false
-            referencedRelation: "activities"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "process_activities_process_id_fkey"
-            columns: ["process_id"]
-            isOneToOne: false
-            referencedRelation: "processes"
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
       }
-      processes: {
+      profiles: {
         Row: {
-          created_at: string | null;
-          created_by: string | null;
-          deadline_days: number | null;
-          description: string | null;
-          email_notification: boolean | null;
-          id: string;
-          name: string;
-          reference_date: string | null;
-          updated_at: string | null;
+          avatar_url: string | null
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          updated_at: string
         }
         Insert: {
-          created_at?: string | null;
-          created_by?: string | null;
-          deadline_days?: number | null;
-          description?: string | null;
-          email_notification?: boolean | null;
-          id?: string;
-          name: string;
-          reference_date?: string | null;
-          updated_at?: string | null;
+          avatar_url?: string | null
+          created_at?: string
+          email: string
+          full_name: string
+          id: string
+          updated_at?: string
         }
         Update: {
-          created_at?: string | null;
-          created_by?: string | null;
-          deadline_days?: number | null;
-          description?: string | null;
-          email_notification?: boolean | null;
-          id?: string;
-          name?: string;
-          reference_date?: string | null;
-          updated_at?: string | null;
+          avatar_url?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          updated_at?: string
         }
         Relationships: []
       }
       project_activities: {
         Row: {
-          id: string
-          project_id: string | null
-          title: string
-          description: string | null
-          responsible: string | null
-          department_ids: string[] | null
-          status: string
-          priority: string
-          deadline: string | null
-          schedule_start: string | null
-          schedule_end: string | null
-          schedule_status: string | null
-          has_fine: boolean
-          fine_amount: number | null
-          fine_reason: string | null
           completed_at: string | null
-          created_by: string | null
           created_at: string
+          created_by: string
+          deadline: string | null
+          deadline_status: Database["public"]["Enums"]["deadline_status"] | null
+          description: string | null
+          id: string
+          kanban_column: string | null
+          name: string
+          order_index: number | null
+          project_id: string
+          scheduled_date: string | null
+          status: Database["public"]["Enums"]["activity_status"] | null
           updated_at: string
         }
         Insert: {
-          id?: string
-          project_id?: string | null
-          title: string
-          description?: string | null
-          responsible?: string | null
-          department_ids?: string[] | null
-          status: string
-          priority: string
-          deadline?: string | null
-          schedule_start?: string | null
-          schedule_end?: string | null
-          schedule_status?: string | null
-          has_fine: boolean
-          fine_amount?: number | null
-          fine_reason?: string | null
           completed_at?: string | null
-          created_by?: string | null
           created_at?: string
+          created_by: string
+          deadline?: string | null
+          deadline_status?:
+            | Database["public"]["Enums"]["deadline_status"]
+            | null
+          description?: string | null
+          id?: string
+          kanban_column?: string | null
+          name: string
+          order_index?: number | null
+          project_id: string
+          scheduled_date?: string | null
+          status?: Database["public"]["Enums"]["activity_status"] | null
           updated_at?: string
         }
         Update: {
-          id?: string
-          project_id?: string | null
-          title?: string
-          description?: string | null
-          responsible?: string | null
-          department_ids?: string[] | null
-          status?: string
-          priority?: string
-          deadline?: string | null
-          schedule_start?: string | null
-          schedule_end?: string | null
-          schedule_status?: string | null
-          has_fine?: boolean
-          fine_amount?: number | null
-          fine_reason?: string | null
           completed_at?: string | null
-          created_by?: string | null
           created_at?: string
+          created_by?: string
+          deadline?: string | null
+          deadline_status?:
+            | Database["public"]["Enums"]["deadline_status"]
+            | null
+          description?: string | null
+          id?: string
+          kanban_column?: string | null
+          name?: string
+          order_index?: number | null
+          project_id?: string
+          scheduled_date?: string | null
+          status?: Database["public"]["Enums"]["activity_status"] | null
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "project_activities_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_indicators"
+            referencedColumns: ["project_id"]
+          },
           {
             foreignKeyName: "project_activities_project_id_fkey"
             columns: ["project_id"]
@@ -279,34 +274,38 @@ export type Database = {
           },
         ]
       }
-      profiles: {
+      project_activity_assignees: {
         Row: {
-          created_at: string | null;
-          department_id: string | null;
-          full_name: string;
-          id: string;
-          role: string | null;
-          updated_at: string | null;
+          activity_id: string
+          created_at: string
+          department_id: string | null
+          id: string
+          user_id: string
         }
         Insert: {
-          created_at?: string | null;
-          department_id?: string | null;
-          full_name: string;
-          id: string;
-          role?: string | null;
-          updated_at?: string | null;
+          activity_id: string
+          created_at?: string
+          department_id?: string | null
+          id?: string
+          user_id: string
         }
         Update: {
-          created_at?: string | null;
-          department_id?: string | null;
-          full_name?: string;
-          id?: string;
-          role?: string | null;
-          updated_at?: string | null;
+          activity_id?: string
+          created_at?: string
+          department_id?: string | null
+          id?: string
+          user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "profiles_department_id_fkey"
+            foreignKeyName: "project_activity_assignees_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "project_activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_activity_assignees_department_id_fkey"
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "departments"
@@ -316,28 +315,52 @@ export type Database = {
       }
       projects: {
         Row: {
-          id: string
-          company_id: string | null
-          name: string
+          color: string | null
+          company_id: string
+          completed_activities: number | null
+          created_at: string
+          created_by: string
           description: string | null
-          created_at: string | null
-          updated_at: string | null
+          end_date: string | null
+          id: string
+          name: string
+          progress: number | null
+          start_date: string | null
+          status: string | null
+          total_activities: number | null
+          updated_at: string
         }
         Insert: {
-          id?: string
-          company_id?: string | null
-          name: string
+          color?: string | null
+          company_id: string
+          completed_activities?: number | null
+          created_at?: string
+          created_by: string
           description?: string | null
-          created_at?: string | null
-          updated_at?: string | null
+          end_date?: string | null
+          id?: string
+          name: string
+          progress?: number | null
+          start_date?: string | null
+          status?: string | null
+          total_activities?: number | null
+          updated_at?: string
         }
         Update: {
-          id?: string
-          company_id?: string | null
-          name?: string
+          color?: string | null
+          company_id?: string
+          completed_activities?: number | null
+          created_at?: string
+          created_by?: string
           description?: string | null
-          created_at?: string | null
-          updated_at?: string | null
+          end_date?: string | null
+          id?: string
+          name?: string
+          progress?: number | null
+          start_date?: string | null
+          status?: string | null
+          total_activities?: number | null
+          updated_at?: string
         }
         Relationships: [
           {
@@ -349,86 +372,63 @@ export type Database = {
           },
         ]
       }
-      sub_activities: {
+      user_companies: {
         Row: {
-          activity_id: string | null;
-          created_at: string | null;
-          description: string | null;
-          id: string;
-          order_index: number;
-          title: string;
-          updated_at: string | null;
+          company_id: string
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
         }
         Insert: {
-          activity_id?: string | null;
-          created_at?: string | null;
-          description?: string | null;
-          id?: string;
-          order_index?: number;
-          title: string;
-          updated_at?: string | null;
+          company_id: string
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
         }
         Update: {
-          activity_id?: string | null;
-          created_at?: string | null;
-          description?: string | null;
-          id?: string;
-          order_index?: number;
-          title?: string;
-          updated_at?: string | null;
+          company_id?: string
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "sub_activities_activity_id_fkey"
-            columns: ["activity_id"]
+            foreignKeyName: "user_companies_company_id_fkey"
+            columns: ["company_id"]
             isOneToOne: false
-            referencedRelation: "activities"
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
       }
-      project_assignees: {
+      user_departments: {
         Row: {
+          created_at: string
+          department_id: string
           id: string
-          project_id: string | null
-          user_id: string | null
-          department_id: string | null
-          role: string | null
-          created_at: string | null
+          is_manager: boolean | null
+          user_id: string
         }
         Insert: {
+          created_at?: string
+          department_id: string
           id?: string
-          project_id?: string | null
-          user_id?: string | null
-          department_id?: string | null
-          role?: string | null
-          created_at?: string | null
+          is_manager?: boolean | null
+          user_id: string
         }
         Update: {
+          created_at?: string
+          department_id?: string
           id?: string
-          project_id?: string | null
-          user_id?: string | null
-          department_id?: string | null
-          role?: string | null
-          created_at?: string | null
+          is_manager?: boolean | null
+          user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "project_assignees_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "project_assignees_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "project_assignees_department_id_fkey"
+            foreignKeyName: "user_departments_department_id_fkey"
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "departments"
@@ -436,75 +436,24 @@ export type Database = {
           },
         ]
       }
-      workflow_processes: {
+      user_roles: {
         Row: {
-          completed_at: string | null
-          created_at: string | null
+          created_at: string
           id: string
-          is_completed: boolean | null
-          order_index: number
-          process_id: string | null
-          workflow_id: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
         }
         Insert: {
-          completed_at?: string | null
-          created_at?: string | null
+          created_at?: string
           id?: string
-          is_completed?: boolean | null
-          order_index: number
-          process_id?: string | null
-          workflow_id?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
         }
         Update: {
-          completed_at?: string | null
-          created_at?: string | null
+          created_at?: string
           id?: string
-          is_completed?: boolean | null
-          order_index?: number
-          process_id?: string | null
-          workflow_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workflow_processes_process_id_fkey"
-            columns: ["process_id"]
-            isOneToOne: false
-            referencedRelation: "processes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_processes_workflow_id_fkey"
-            columns: ["workflow_id"]
-            isOneToOne: false
-            referencedRelation: "workflows"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      workflows: {
-        Row: {
-          created_at: string | null
-          created_by: string | null
-          description: string | null
-          id: string
-          name: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          name: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          name?: string
-          updated_at?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
         }
         Relationships: []
       }
@@ -581,13 +530,61 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      project_indicators: {
+        Row: {
+          beat_goal_count: number | null
+          company_id: string | null
+          completed_count: number | null
+          completed_late_count: number | null
+          completed_on_time_count: number | null
+          late_count: number | null
+          on_time_count: number | null
+          progress: number | null
+          project_id: string | null
+          project_name: string | null
+          total_activities: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
-      [_ in never]: never
+      get_user_company_role: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: Database["public"]["Enums"]["app_role"]
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      user_belongs_to_company: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
+      user_belongs_to_department: {
+        Args: { _department_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      activity_status: "pendente" | "em_andamento" | "concluida" | "cancelada"
+      app_role: "admin" | "gestor" | "colaborador"
+      deadline_status:
+        | "no_prazo"
+        | "fora_do_prazo"
+        | "concluido_no_prazo"
+        | "concluido_atrasado"
+        | "bateu_meta"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -714,6 +711,16 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      activity_status: ["pendente", "em_andamento", "concluida", "cancelada"],
+      app_role: ["admin", "gestor", "colaborador"],
+      deadline_status: [
+        "no_prazo",
+        "fora_do_prazo",
+        "concluido_no_prazo",
+        "concluido_atrasado",
+        "bateu_meta",
+      ],
+    },
   },
 } as const

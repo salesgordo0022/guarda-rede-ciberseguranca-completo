@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -39,17 +39,18 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 interface TeamMember {
     id: string;
     full_name: string;
+    email: string;
     role: "admin" | "gestor" | "colaborador";
     department_id: string | null;
     department?: {
         id: string;
         name: string;
-    };
-    email?: string;
+    } | null;
 }
 
 const getRoleInfo = (role: string) => {
@@ -99,7 +100,7 @@ const createUserSchema = z.object({
     firstName: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
     lastName: z.string().min(2, "Sobrenome deve ter pelo menos 2 caracteres"),
     email: z.string().email("Email inválido"),
-    department_id: z.string().min(1, "Selecione um departamento"),
+    department_id: z.string().optional(),
     role: z.enum(["admin", "gestor", "colaborador"], {
         required_error: "Selecione um tipo de usuário",
     }),
@@ -107,7 +108,7 @@ const createUserSchema = z.object({
 
 export const TeamTabContent = () => {
     const { toast } = useToast();
-    const queryClient = useQueryClient();
+    const { selectedCompanyId } = useAuth();
     const [dialogOpen, setDialogOpen] = useState(false);
 
     // Form
@@ -124,106 +125,86 @@ export const TeamTabContent = () => {
 
     // Buscar departamentos
     const { data: departments } = useQuery({
-        queryKey: ["departments"],
+        queryKey: ["departments", selectedCompanyId],
         queryFn: async () => {
+            if (!selectedCompanyId) return [];
             const { data, error } = await supabase
                 .from("departments")
                 .select("*")
+                .eq("company_id", selectedCompanyId)
                 .order("name");
             if (error) throw error;
             return data;
         },
+        enabled: !!selectedCompanyId,
     });
 
-    // Buscar membros da equipe do banco de dados
+    // Buscar membros da equipe combinando profiles, user_roles e user_departments
     const { data: teamMembers, isLoading, error } = useQuery({
-        queryKey: ["team-members"],
+        queryKey: ["team-members", selectedCompanyId],
         queryFn: async () => {
-            const { data, error } = await supabase
+            if (!selectedCompanyId) return [];
+
+            // Buscar usuários da empresa
+            const { data: companyUsers, error: companyError } = await supabase
+                .from("user_companies")
+                .select("user_id, role")
+                .eq("company_id", selectedCompanyId);
+
+            if (companyError) throw companyError;
+
+            if (!companyUsers || companyUsers.length === 0) return [];
+
+            const userIds = companyUsers.map(u => u.user_id);
+
+            // Buscar perfis
+            const { data: profiles, error: profilesError } = await supabase
                 .from("profiles")
+                .select("id, full_name, email")
+                .in("id", userIds);
+
+            if (profilesError) throw profilesError;
+
+            // Buscar departamentos dos usuários
+            const { data: userDepts, error: deptsError } = await supabase
+                .from("user_departments")
                 .select(`
-          id,
-          full_name,
-          role,
-          department_id,
-          department:departments(id, name)
-        `)
-                .order("full_name");
+                    user_id,
+                    department_id,
+                    department:departments(id, name)
+                `)
+                .in("user_id", userIds);
 
-            if (error) throw error;
-            return data as TeamMember[];
-        },
-    });
+            if (deptsError) throw deptsError;
 
-    // Buscar emails dos usuários
-    const { data: users } = useQuery({
-        queryKey: ["auth-users"],
-        queryFn: async () => {
-            const { data: { users }, error } = await supabase.auth.admin.listUsers();
-            if (error) throw error;
-            return users;
-        },
-    });
+            // Combinar dados
+            const members: TeamMember[] = (profiles || []).map(profile => {
+                const companyUser = companyUsers.find(u => u.user_id === profile.id);
+                const userDept = userDepts?.find(d => d.user_id === profile.id);
 
-    // Mutation para criar usuário
-    const createUserMutation = useMutation({
-        mutationFn: async (values: z.infer<typeof createUserSchema>) => {
-            // 1. Criar usuário no Auth
-            const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-                email: values.email,
-                email_confirm: true,
-                user_metadata: {
-                    full_name: `${values.firstName} ${values.lastName}`,
-                },
+                return {
+                    id: profile.id,
+                    full_name: profile.full_name,
+                    email: profile.email,
+                    role: (companyUser?.role as "admin" | "gestor" | "colaborador") || "colaborador",
+                    department_id: userDept?.department_id || null,
+                    department: userDept?.department as { id: string; name: string } | null,
+                };
             });
 
-            if (authError) throw authError;
-
-            // 2. Criar/atualizar perfil
-            const { error: profileError } = await supabase
-                .from("profiles")
-                .upsert({
-                    id: authData.user.id,
-                    full_name: `${values.firstName} ${values.lastName}`,
-                    department_id: values.department_id,
-                    role: values.role,
-                });
-
-            if (profileError) throw profileError;
-
-            return authData.user;
+            return members;
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["team-members"] });
-            queryClient.invalidateQueries({ queryKey: ["auth-users"] });
-            toast({
-                title: "Usuário criado com sucesso!",
-                description: "O novo membro foi adicionado à equipe.",
-            });
-            setDialogOpen(false);
-            form.reset();
-        },
-        onError: (error: any) => {
-            toast({
-                title: "Erro ao criar usuário",
-                description: error.message,
-                variant: "destructive",
-            });
-        },
+        enabled: !!selectedCompanyId,
     });
 
-    const onSubmit = (values: z.infer<typeof createUserSchema>) => {
-        createUserMutation.mutate(values);
+    const onSubmit = async (values: z.infer<typeof createUserSchema>) => {
+        toast({
+            title: "Funcionalidade em desenvolvimento",
+            description: "A criação de usuários será implementada em breve.",
+        });
+        setDialogOpen(false);
+        form.reset();
     };
-
-    // Combinar dados de profiles com emails
-    const membersWithEmails = teamMembers?.map((member) => {
-        const user = users?.find((u) => u.id === member.id);
-        return {
-            ...member,
-            email: user?.email,
-        };
-    });
 
     // Estatísticas
     const stats = {
@@ -257,7 +238,7 @@ export const TeamTabContent = () => {
                 <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                        Erro ao carregar membros da equipe: {error.message}
+                        Erro ao carregar membros da equipe: {(error as Error).message}
                     </AlertDescription>
                 </Alert>
             </div>
@@ -412,8 +393,8 @@ export const TeamTabContent = () => {
                                     >
                                         Cancelar
                                     </Button>
-                                    <Button type="submit" disabled={createUserMutation.isPending}>
-                                        {createUserMutation.isPending ? "Criando..." : "Criar Usuário"}
+                                    <Button type="submit">
+                                        Criar Usuário
                                     </Button>
                                 </DialogFooter>
                             </form>
@@ -424,187 +405,84 @@ export const TeamTabContent = () => {
 
             <div className="grid gap-4 md:grid-cols-4">
                 <Card>
-                    <CardHeader className="pb-3">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">
-                            Total de Membros
-                        </CardTitle>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">Total</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-3xl font-bold">{stats.total}</div>
+                        <div className="text-2xl font-bold">{stats.total}</div>
                     </CardContent>
                 </Card>
-
-                <Card className="border-red-200 bg-red-50/50">
-                    <CardHeader className="pb-3">
-                        <CardTitle className="text-sm font-medium text-red-700">
-                            Administradores
-                        </CardTitle>
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-red-600">Admins</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-3xl font-bold text-red-700">{stats.admins}</div>
+                        <div className="text-2xl font-bold">{stats.admins}</div>
                     </CardContent>
                 </Card>
-
-                <Card className="border-blue-200 bg-blue-50/50">
-                    <CardHeader className="pb-3">
-                        <CardTitle className="text-sm font-medium text-blue-700">
-                            Gestores
-                        </CardTitle>
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-blue-600">Gestores</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-3xl font-bold text-blue-700">{stats.gestores}</div>
+                        <div className="text-2xl font-bold">{stats.gestores}</div>
                     </CardContent>
                 </Card>
-
-                <Card className="border-green-200 bg-green-50/50">
-                    <CardHeader className="pb-3">
-                        <CardTitle className="text-sm font-medium text-green-700">
-                            Colaboradores
-                        </CardTitle>
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-green-600">Colaboradores</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-3xl font-bold text-green-700">{stats.colaboradores}</div>
+                        <div className="text-2xl font-bold">{stats.colaboradores}</div>
                     </CardContent>
                 </Card>
             </div>
 
-            {/* Cards de Informação sobre Roles */}
-            <div className="grid gap-4 md:grid-cols-3">
-                {["admin", "gestor", "colaborador"].map((role) => {
-                    const roleInfo = getRoleInfo(role);
-                    const Icon = roleInfo.icon;
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {teamMembers?.map((member) => {
+                    const roleInfo = getRoleInfo(member.role);
+                    const RoleIcon = roleInfo.icon;
+
                     return (
-                        <Card key={role} className="hover:shadow-lg transition-shadow">
-                            <CardHeader>
-                                <div className="flex items-center gap-3">
-                                    <div className={`p-2 rounded-lg ${roleInfo.color}`}>
-                                        <Icon className="h-5 w-5" />
-                                    </div>
-                                    <div>
-                                        <CardTitle>{roleInfo.label}</CardTitle>
+                        <Card key={member.id} className="hover:shadow-md transition-shadow">
+                            <CardHeader className="pb-2">
+                                <div className="flex items-start gap-4">
+                                    <Avatar className="h-12 w-12">
+                                        <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${member.full_name}`} />
+                                        <AvatarFallback>{getInitials(member.full_name)}</AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex-1 min-w-0">
+                                        <CardTitle className="text-base truncate">{member.full_name}</CardTitle>
+                                        <CardDescription className="flex items-center gap-1 text-xs truncate">
+                                            <Mail className="h-3 w-3" />
+                                            {member.email}
+                                        </CardDescription>
                                     </div>
                                 </div>
                             </CardHeader>
-                            <CardContent>
-                                <CardDescription className="text-sm leading-relaxed">
-                                    {roleInfo.description}
-                                </CardDescription>
+                            <CardContent className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <Badge className={roleInfo.color}>
+                                        <RoleIcon className="h-3 w-3 mr-1" />
+                                        {roleInfo.label}
+                                    </Badge>
+                                </div>
+                                {member.department && (
+                                    <p className="text-xs text-muted-foreground">
+                                        Departamento: {member.department.name}
+                                    </p>
+                                )}
                             </CardContent>
                         </Card>
                     );
                 })}
-            </div>
 
-            {/* Lista de Membros */}
-            <div>
-                <h2 className="text-2xl font-bold mb-4">Membros da Equipe</h2>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {membersWithEmails?.map((member) => {
-                        const roleInfo = getRoleInfo(member.role);
-                        const Icon = roleInfo.icon;
-                        return (
-                            <Card
-                                key={member.id}
-                                className="hover:shadow-lg transition-all hover-scale cursor-pointer animate-fade-in"
-                            >
-                                <CardHeader className="pb-3">
-                                    <div className="flex items-start justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <Avatar className="h-12 w-12">
-                                                <AvatarImage
-                                                    src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${member.full_name}`}
-                                                />
-                                                <AvatarFallback>{getInitials(member.full_name)}</AvatarFallback>
-                                            </Avatar>
-                                            <div>
-                                                <CardTitle className="text-lg">{member.full_name}</CardTitle>
-                                                <p className="text-sm text-muted-foreground">
-                                                    {member.department?.name || "Sem departamento"}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <Badge className={roleInfo.color}>
-                                            <Icon className="h-3 w-3 mr-1" />
-                                            {roleInfo.label}
-                                        </Badge>
-                                    </div>
-                                </CardHeader>
-                                <CardContent className="space-y-2">
-                                    {member.email && (
-                                        <div className="flex items-center gap-2 text-sm">
-                                            <Mail className="h-4 w-4 text-muted-foreground" />
-                                            <span className="text-muted-foreground truncate">{member.email}</span>
-                                        </div>
-                                    )}
-                                    <div className="flex items-center gap-2 text-sm">
-                                        <Users className="h-4 w-4 text-muted-foreground" />
-                                        <span className="text-muted-foreground">
-                                            {member.department?.name || "Sem departamento"}
-                                        </span>
-                                    </div>
-                                    <div className="pt-2 border-t">
-                                        <p className="text-xs text-muted-foreground leading-relaxed">
-                                            {roleInfo.description}
-                                        </p>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        );
-                    })}
-                </div>
-            </div>
-
-            {/* Legenda de Permissões */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>Níveis de Permissão</CardTitle>
-                    <CardDescription>
-                        Entenda o que cada tipo de usuário pode fazer no sistema
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
-                        <div className="flex items-start gap-3">
-                            <Badge className="bg-red-600 text-white mt-1">
-                                <Shield className="h-3 w-3 mr-1" />
-                                Admin
-                            </Badge>
-                            <div className="flex-1">
-                                <p className="font-medium">Administrador</p>
-                                <p className="text-sm text-muted-foreground">
-                                    Acesso total a todos os departamentos e visão diversificada de cada departamento e suas atividades, podendo ver cada demanda e suas informações.
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="flex items-start gap-3">
-                            <Badge className="bg-blue-600 text-white mt-1">
-                                <UserCog className="h-3 w-3 mr-1" />
-                                Gestor
-                            </Badge>
-                            <div className="flex-1">
-                                <p className="font-medium">Gestor de Departamento</p>
-                                <p className="text-sm text-muted-foreground">
-                                    Acesso total apenas ao seu próprio departamento, podendo visualizar todas as atividades e demandas do seu setor.
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="flex items-start gap-3">
-                            <Badge className="bg-green-600 text-white mt-1">
-                                <UserIcon className="h-3 w-3 mr-1" />
-                                Colaborador
-                            </Badge>
-                            <div className="flex-1">
-                                <p className="font-medium">Colaborador</p>
-                                <p className="text-sm text-muted-foreground">
-                                    Acesso apenas às tarefas que estão envolvidas dentro do seu departamento ou as que foram atribuídas diretamente a ele.
-                                </p>
-                            </div>
-                        </div>
+                {teamMembers?.length === 0 && (
+                    <div className="col-span-full text-center py-8 text-muted-foreground">
+                        Nenhum membro encontrado na equipe
                     </div>
-                </CardContent>
-            </Card>
+                )}
+            </div>
         </div>
     );
 };
