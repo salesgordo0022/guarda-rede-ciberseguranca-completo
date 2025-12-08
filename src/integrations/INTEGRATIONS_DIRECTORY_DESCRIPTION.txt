@@ -1,0 +1,21 @@
+# Descrição do Diretório integrations/
+
+Este diretório contém todas as integrações com serviços externos utilizados pela aplicação.
+
+## Subdiretórios:
+
+1. **supabase/** - Integração completa com o Supabase:
+   - client.ts - Configuração e inicialização do cliente Supabase
+   - mock.ts - Implementação de banco de dados local para desenvolvimento
+   - types.ts - Definições de tipos TypeScript para tabelas do Supabase
+
+## Propósito:
+- Centralizar todas as integrações externas em um único local
+- Facilitar a manutenção e atualização de integrações
+- Permitir fácil substituição de serviços (ex: trocar Supabase por outro backend)
+- Separar a lógica de integração da lógica de negócios da aplicação
+
+## Características:
+- O Supabase é utilizado como backend principal (autenticação, banco de dados, storage)
+- O modo mock permite desenvolvimento offline e testes locais
+- As tipagens ajudam na segurança de tipos e autocomplete no desenvolvimento

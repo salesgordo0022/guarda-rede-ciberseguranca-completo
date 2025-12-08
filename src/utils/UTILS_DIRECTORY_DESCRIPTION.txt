@@ -1,0 +1,21 @@
+# Descrição do Diretório utils/
+
+Este diretório contém funções utilitárias específicas da aplicação relacionadas a funcionalidades particulares.
+
+## Arquivos:
+
+1. **taskUtils.tsx**:
+   - Funções utilitárias específicas para manipulação de tarefas
+   - Funções de formatação e cálculo relacionadas a tarefas
+   - Utilitários para trabalhar com datas, prioridades e status de tarefas
+
+## Propósito:
+- Armazenar funções utilitárias específicas do domínio da aplicação
+- Complementar as funções genéricas do diretório lib/
+- Prover funcionalidades especializadas para áreas específicas
+- Manter código organizado por contexto de uso
+
+## Características:
+- Funções focadas especificamente em tarefas e funcionalidades relacionadas
+- Utilitários que podem envolver lógica de negócios específica
+- Código auxiliar especializado para partes específicas da aplicação
