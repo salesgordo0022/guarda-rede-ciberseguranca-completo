@@ -49,26 +49,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     // Função para buscar o perfil do usuário no banco de dados
-    const fetchProfile = async (userId: string) => {
+    const fetchProfile = async (userId: string): Promise<UserProfile | null> => {
         try {
-            // Consulta o perfil do usuário na tabela 'profiles'
-            const { data, error } = await supabase
+            // Busca perfil básico
+            const { data: profileData, error: profileError } = await supabase
                 .from('profiles')
                 .select('*')
                 .eq('id', userId)
                 .single();
 
-            // Trata erros na consulta
-            if (error) {
-                console.error('Error fetching profile:', error);
-                // Fallback para ambiente de desenvolvimento/mock caso o perfil não exista
+            if (profileError) {
+                console.error('Error fetching profile:', profileError);
                 return null;
             }
 
-            // Retorna os dados do perfil
-            return data as UserProfile;
+            // Busca role do usuário
+            const { data: roleData } = await supabase
+                .from('user_roles')
+                .select('role')
+                .eq('user_id', userId)
+                .single();
+
+            // Busca empresa do usuário
+            const { data: companyData } = await supabase
+                .from('user_companies')
+                .select('company_id')
+                .eq('user_id', userId)
+                .single();
+
+            // Busca departamento do usuário
+            const { data: departmentData } = await supabase
+                .from('user_departments')
+                .select('department_id')
+                .eq('user_id', userId)
+                .single();
+
+            // Monta o perfil completo
+            const userProfile: UserProfile = {
+                id: profileData.id,
+                full_name: profileData.full_name,
+                department_id: departmentData?.department_id || null,
+                company_id: companyData?.company_id || null,
+                role: (roleData?.role as 'admin' | 'gestor' | 'colaborador') || 'colaborador',
+                created_at: profileData.created_at,
+                updated_at: profileData.updated_at,
+            };
+
+            return userProfile;
         } catch (error) {
-            // Trata erros inesperados
             console.error('Unexpected error fetching profile:', error);
             return null;
         }
