@@ -1,0 +1,14 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  VITE_SUPABASE_PROJECT_ID = "okqxbemtbnokflqtqjds"
+  VITE_SUPABASE_URL = "https://okqxbemtbnokflqtqjds.supabase.co"
+  VITE_USE_LOCAL_DB = "false"
+
+# Redirect all requests to index.html for SPA routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
