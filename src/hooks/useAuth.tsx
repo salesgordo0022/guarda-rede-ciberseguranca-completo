@@ -79,10 +79,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
             // Verifica se há uma sessão ativa
             const { data: { session } } = await supabase.auth.getSession();
+            console.log('Initial session check:', session);
 
             // Se houver usuário na sessão, busca o perfil
             if (session?.user) {
                 const profile = await fetchProfile(session.user.id);
+                console.log('Fetched profile:', profile);
 
                 // Se estiver usando mock/local e nenhum perfil foi retornado, usa um perfil mock
                 const finalProfile = profile || (session.user.id === 'local-user' ? {
@@ -105,12 +107,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 });
             } else {
                 // Se não houver sessão, marca como carregado
-                setAuthState(prev => ({ ...prev, loading: false }));
+                console.log('No session found, checking if we should create a default session');
+                // Check if we're in mock mode and should create a default session
+                const isLocal = import.meta.env.VITE_USE_LOCAL_DB === 'true' || import.meta.env.MODE === 'development' || !import.meta.env.VITE_SUPABASE_URL;
+                if (isLocal) {
+                    console.log('Creating default local session');
+                    // Create a default session for local development
+                    const defaultUser = {
+                        id: 'local-user',
+                        email: 'admin@gclick.com',
+                        aud: 'authenticated',
+                        role: 'authenticated',
+                        created_at: new Date().toISOString(),
+                        app_metadata: {},
+                        user_metadata: {}
+                    };
+                    
+                    const defaultSession = {
+                        user: defaultUser,
+                        expires_at: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
+                        access_token: 'mock-access-token',
+                        refresh_token: 'mock-refresh-token',
+                        expires_in: 3600,
+                        token_type: 'bearer'
+                    } as Session;
+                    
+                    const profile = await fetchProfile(defaultUser.id);
+                    const finalProfile = profile || {
+                        id: 'local-user',
+                        full_name: 'Usuário Local',
+                        department_id: null,
+                        company_id: 'company-1',
+                        role: 'admin',
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString(),
+                    } as UserProfile;
+                    
+                    setAuthState({
+                        user: defaultUser,
+                        session: defaultSession,
+                        profile: finalProfile,
+                        loading: false,
+                        selectedCompanyId: finalProfile.company_id || null,
+                    });
+                } else {
+                    setAuthState(prev => ({ ...prev, loading: false }));
+                }
             }
 
             // Escuta mudanças no estado de autenticação
             const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-                console.log('Auth state change:', event);
+                console.log('Auth state change:', event, session);
 
                 // Se houver uma nova sessão, atualiza os dados
                 if (session?.user) {

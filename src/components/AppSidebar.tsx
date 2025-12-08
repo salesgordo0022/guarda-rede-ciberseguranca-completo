@@ -35,6 +35,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Tutorial } from "@/components/Tutorial";
+import { NotificationBell } from "@/components/NotificationBell";
 
 const mainMenuItems = [
   { title: "Painel de Controle", url: "/", icon: LayoutDashboard },
@@ -246,8 +247,6 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="p-4 space-y-2 mt-auto">
-        <Tutorial />
-
         <button className="flex items-center gap-3 px-4 py-3 rounded-lg transition-all bg-[hsl(194,100%,8%)] text-white hover:bg-[hsl(194,100%,12%)] hover-scale w-full">
           <HelpCircle className="h-5 w-5 flex-shrink-0" />
           {open && <span className="text-[15px]">Ajuda</span>}

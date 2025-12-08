@@ -1,27 +1,25 @@
-import { Search } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Search, Calendar, ClipboardList, CheckCircle2, TrendingUp, Clock, XCircle, AlertTriangle, CheckCircle, DollarSign, Users, Bell } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ActionButtons } from "@/components/ActionButtons";
 import { DepartmentTasksPanel } from "@/components/DepartmentTasksPanel";
-import {
-  Calendar,
-  ClipboardList,
-  CheckCircle2,
-  TrendingUp,
-  Clock,
-  XCircle
-} from "lucide-react";
 import { DashboardCard } from "@/components/DashboardCard";
 import { TaskChart } from "@/components/TaskChart";
 import { useTasks } from "@/hooks/useTasks";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useState, useMemo } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ActivitiesTable } from "@/components/ActivitiesTable";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { TaskStatus, Task } from "@/types/task";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+
+import { ActivitiesTable } from "@/components/ActivitiesTable";
 import { CreateTaskDialog } from "@/components/CreateTaskDialog";
+import { Task, TaskStatus } from "@/types/task";
 
 const FilteredTasksModal = ({
   status,
@@ -85,7 +83,7 @@ const Index = () => {
 
   // Filtros para useTasks
   const filters = useMemo(() => {
-    const f: any = {};
+    const f: Record<string, string> = {};
     if (date) {
       const dateStr = date.toISOString().split('T')[0];
       f.date_from = dateStr;
@@ -135,7 +133,7 @@ const Index = () => {
     { name: 'Atrasadas', value: metrics.overdue },
   ] : [];
 
-  const handleChartClick = (data: any) => {
+  const handleChartClick = (data: { name: string } | null) => {
     if (data && data.name) {
       const statusMap: Record<string, string> = {
         'Feito': 'Feito',
@@ -153,6 +151,15 @@ const Index = () => {
 
   return (
     <div className="p-6 space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">Painel de Controle</h1>
+          <p className="text-muted-foreground">
+            Bem-vindo de volta, {'usuário'}
+          </p>
+        </div>
+      </div>
+
       <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

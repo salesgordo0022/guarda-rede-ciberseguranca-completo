@@ -28,9 +28,34 @@ import ProjectDetail from "./pages/ProjectDetail";
 // Importações de componentes personalizados
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { LoginBar } from "@/components/LoginBar";
+import { NotificationBell } from "@/components/NotificationBell";
+import { Tutorial } from "@/components/Tutorial";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
+// Import deadline monitoring
+import { startDeadlineMonitoring } from "@/utils/deadlineMonitor";
 
 // Cliente para gerenciamento de consultas assíncronas
 const queryClient = new QueryClient();
+
+// Componente para exibir o perfil do usuário
+const UserProfile = () => {
+  const { profile } = useAuth();
+  
+  return (
+    <div className="flex items-center gap-2">
+      <Avatar className="h-8 w-8">
+        <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${profile?.full_name || 'User'}`} />
+        <AvatarFallback className="text-xs">
+          {profile?.full_name?.substring(0, 2).toUpperCase() || 'US'}
+        </AvatarFallback>
+      </Avatar>
+      <span className="text-sm font-medium hidden md:inline">
+        {profile?.full_name || 'Usuário'}
+      </span>
+    </div>
+  );
+};
 
 // Componente para aplicar o tema globalmente
 // Este componente escuta mudanças no tema e aplica as classes CSS apropriadas ao elemento raiz
@@ -80,56 +105,72 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 // Componente principal da aplicação
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <SystemSettingsProvider>
-      <AuthProvider>
-        <TooltipProvider>
-          <ErrorBoundary>
-            <Toaster />
-            <Sonner />
-            <ThemeApplicator />
-            <LoginBar />
-            <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
-              <Routes>
-                <Route path="/auth" element={<Auth />} />
-                <Route
-                  path="/*"
-                  element={
-                    <ProtectedRoute>
-                      <SidebarProvider>
-                        <div className="min-h-screen flex w-full">
-                          <AppSidebar />
-                          <main className="flex-1 overflow-auto">
-                            <div className="border-b border-border bg-background sticky top-0 z-10">
-                              <div className="flex items-center h-14 px-4">
-                                <SidebarTrigger />
-                              </div>
+const App = () => {
+  useEffect(() => {
+    // Start deadline monitoring when app loads
+    startDeadlineMonitoring();
+  }, []);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <SystemSettingsProvider>
+        <AuthProvider>
+          <TooltipProvider>
+            <ErrorBoundary>
+              <Toaster />
+              <Sonner />
+              <ThemeApplicator />
+              <LoginBar />
+              <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+                <Routes>
+                  <Route path="/auth" element={<Auth />} />
+                  <Route
+                    path="/*"
+                    element={
+                      <ProtectedRoute>
+                        <div className="relative min-h-screen flex w-full">
+                          <SidebarProvider>
+                            <div className="flex w-full">
+                              <AppSidebar />
+                              <main className="flex-1 overflow-auto">
+                                <div className="border-b border-border bg-background sticky top-0 z-10">
+                                  <div className="flex items-center justify-between h-14 px-4">
+                                    <SidebarTrigger />
+                                    <div className="flex items-center gap-4">
+                                      <NotificationBell />
+                                      <UserProfile />
+                                    </div>
+                                  </div>
+                                </div>
+                                <Routes>
+                                  <Route path="/" element={<Index data-tutorial="dashboard" />} />
+                                  <Route path="/team" element={<Team data-tutorial="team" />} />
+                                  <Route path="/departments" element={<Departments data-tutorial="departments" />} />
+                                  <Route path="/users" element={<Users data-tutorial="users" />} />
+                                  <Route path="/activities" element={<Activities data-tutorial="activities" />} />
+                                  <Route path="/projects" element={<Projects />} />
+                                  <Route path="/projects/:projectId" element={<ProjectDetail />} />
+                                  <Route path="/settings" element={<Settings data-tutorial="settings" />} />
+                                  <Route path="*" element={<NotFound />} />
+                                </Routes>
+                              </main>
                             </div>
-                            <Routes>
-                              <Route path="/" element={<Index data-tutorial="dashboard" />} />
-                              <Route path="/team" element={<Team data-tutorial="team" />} />
-                              <Route path="/departments" element={<Departments data-tutorial="departments" />} />
-                              <Route path="/users" element={<Users data-tutorial="users" />} />
-                              <Route path="/activities" element={<Activities data-tutorial="activities" />} />
-                              <Route path="/projects" element={<Projects />} />
-                              <Route path="/projects/:projectId" element={<ProjectDetail />} />
-                              <Route path="/settings" element={<Settings data-tutorial="settings" />} />
-                              <Route path="*" element={<NotFound />} />
-                            </Routes>
-                          </main>
+                          </SidebarProvider>
                         </div>
-                      </SidebarProvider>
-                    </ProtectedRoute>
-                  }
-                />
-              </Routes>
-            </BrowserRouter>
-          </ErrorBoundary>
-        </TooltipProvider>
-      </AuthProvider>
-    </SystemSettingsProvider>
-  </QueryClientProvider>
-);
+                      </ProtectedRoute>
+                    }
+                  />
+                </Routes>
+                <div className="fixed bottom-4 right-4 z-50">
+                  <Tutorial />
+                </div>
+              </BrowserRouter>
+            </ErrorBoundary>
+          </TooltipProvider>
+        </AuthProvider>
+      </SystemSettingsProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;

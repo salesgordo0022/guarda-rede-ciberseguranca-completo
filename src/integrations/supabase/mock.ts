@@ -41,6 +41,8 @@ type Tables = {
   projects: Row[];
   project_activities: Row[];
   project_assignees: Row[];
+  // Tabela de notificações
+  notifications: Row[];
 };
 
 function readDB(): Tables {
@@ -146,6 +148,46 @@ function readDB(): Tables {
       }
     ],
     project_assignees: [],
+    // Dados iniciais para notificações
+    notifications: [
+      {
+        id: 'notif-1',
+        title: 'Nova atividade atribuída',
+        description: 'Você recebeu uma nova atividade: "Definir escopo do projeto"',
+        type: 'task_assigned',
+        created_by: 'local-user',
+        created_for: 'user-2',
+        task_id: 'proj-act-1',
+        project_id: 'proj-1',
+        read: false,
+        created_at: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
+        updated_at: new Date(Date.now() - 3600000).toISOString()
+      },
+      {
+        id: 'notif-2',
+        title: 'Atividade concluída',
+        description: 'A atividade "Backup do Servidor" foi marcada como concluída',
+        type: 'task_completed',
+        created_by: 'user-3',
+        created_for: 'local-user',
+        task_id: 'task-3', // Assuming this is the ID of the backup task
+        read: false,
+        created_at: new Date(Date.now() - 7200000).toISOString(), // 2 hours ago
+        updated_at: new Date(Date.now() - 7200000).toISOString()
+      },
+      {
+        id: 'notif-3',
+        title: 'Prazo se aproximando',
+        description: 'A atividade "Reunião de Metas" vence amanhã',
+        type: 'deadline_approaching',
+        created_by: 'local-user',
+        created_for: 'user-2',
+        task_id: 'task-4', // Assuming this is the ID of the meeting task
+        read: true,
+        created_at: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+        updated_at: new Date(Date.now() - 86400000).toISOString()
+      }
+    ]
   };
 
   if (raw) {
@@ -518,6 +560,52 @@ class MockQueryBuilder {
     return this;
   }
 
+  processSelect(rows: Row[]) {
+    if (!this._select || this._select === '*') return rows;
+
+    return rows.map(row => {
+      const newRow: Row = {} as Row;
+
+      // Seleção básica de colunas
+      if (this._select?.includes('*')) {
+        Object.assign(newRow, row);
+      } else {
+        this._select?.split(',').forEach(col => {
+          const cleanCol = col.trim();
+          if (!cleanCol.includes(':') && !cleanCol.includes('(')) {
+            if (row[cleanCol] !== undefined) newRow[cleanCol] = row[cleanCol];
+          }
+        });
+      }
+
+      // Tratar Joins (Implementação mock para relações conhecidas específicas)
+      if (this._select?.includes('department:departments')) {
+        const dept = getTable('departments').find(d => d.id === row.department_id);
+        newRow.department = dept ? { id: dept.id, name: dept.name } : null;
+      }
+      if (this._select?.includes('assigned_user:profiles')) {
+        // Mock: responsável é armazenado como string de nome nas tarefas, mas tentamos encontrar o perfil
+        // No banco de dados real é um ID. Aqui podemos ter problemas se o responsável for nome.
+        // Vamos tentar corresponder pelo nome se o ID falhar
+        let user = getTable('profiles').find(p => p.id === row.responsible);
+        if (!user) user = getTable('profiles').find(p => p.full_name === row.responsible);
+        newRow.assigned_user = user ? { id: user.id, full_name: user.full_name } : null;
+      }
+      if (this._select?.includes('creator:profiles')) {
+        const user = getTable('profiles').find(p => p.id === row.created_by);
+        newRow.creator = user ? { id: user.id, full_name: user.full_name } : null;
+      }
+      
+      // Handle notifications creator join
+      if (this.table === 'notifications' && this._select?.includes('creator:created_by')) {
+        const user = getTable('profiles').find(p => p.id === row.created_by);
+        newRow.creator = user ? { full_name: user.full_name } : null;
+      }
+
+      return newRow;
+    });
+  }
+
   // Execução
   async then(
     resolve: (res: { data: Row | Row[] | null; error: { message: string } | null }) => void, 
@@ -584,46 +672,6 @@ class MockQueryBuilder {
       const error = e as { message: string };
       resolve({ data: null, error: { message: error.message } });
     }
-  }
-
-  processSelect(rows: Row[]) {
-    if (!this._select || this._select === '*') return rows;
-
-    return rows.map(row => {
-      const newRow: Row = {} as Row;
-
-      // Seleção básica de colunas
-      if (this._select?.includes('*')) {
-        Object.assign(newRow, row);
-      } else {
-        this._select?.split(',').forEach(col => {
-          const cleanCol = col.trim();
-          if (!cleanCol.includes(':') && !cleanCol.includes('(')) {
-            if (row[cleanCol] !== undefined) newRow[cleanCol] = row[cleanCol];
-          }
-        });
-      }
-
-      // Tratar Joins (Implementação mock para relações conhecidas específicas)
-      if (this._select?.includes('department:departments')) {
-        const dept = getTable('departments').find(d => d.id === row.department_id);
-        newRow.department = dept ? { id: dept.id, name: dept.name } : null;
-      }
-      if (this._select?.includes('assigned_user:profiles')) {
-        // Mock: responsável é armazenado como string de nome nas tarefas, mas tentamos encontrar o perfil
-        // No banco de dados real é um ID. Aqui podemos ter problemas se o responsável for nome.
-        // Vamos tentar corresponder pelo nome se o ID falhar
-        let user = getTable('profiles').find(p => p.id === row.responsible);
-        if (!user) user = getTable('profiles').find(p => p.full_name === row.responsible);
-        newRow.assigned_user = user ? { id: user.id, full_name: user.full_name } : null;
-      }
-      if (this._select?.includes('creator:profiles')) {
-        const user = getTable('profiles').find(p => p.id === row.created_by);
-        newRow.creator = user ? { id: user.id, full_name: user.full_name } : null;
-      }
-
-      return newRow;
-    });
   }
 }
 

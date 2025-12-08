@@ -22,7 +22,7 @@ const priorities = [
   { value: "urgent", label: "Urgente", color: "text-red-600" },
 ];
 
-const TaskGenerator = () => {
+const ProcessGenerator = () => {
   const { toast } = useToast();
   const [generatorType, setGeneratorType] = useState<"process">("process");
   const [title, setTitle] = useState("");
@@ -278,4 +278,4 @@ const TaskGenerator = () => {
   );
 };
 
-export default TaskGenerator;
+export default ProcessGenerator;

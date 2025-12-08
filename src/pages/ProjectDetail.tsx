@@ -29,6 +29,7 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { ProjectActivitiesTable } from "@/components/ProjectActivitiesTable";
+import { createActivityCreatedNotification, createActivityAssignedNotification, createActivityCompletedNotification } from "@/utils/notificationUtils";
 
 interface Project {
   id: string;
@@ -167,7 +168,7 @@ const ProjectDetail = () => {
     }
 
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("project_activities")
         .insert({
           project_id: projectId,
@@ -183,9 +184,16 @@ const ProjectDetail = () => {
           schedule_status: calculateScheduleStatus(activityDeadline, activityScheduleEnd),
           has_fine: false,
           created_by: profile?.id || null,
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Create notification for the new activity
+      if (data && profile?.id) {
+        await createActivityCreatedNotification(data, profile.id);
+      }
 
       toast.success("Atividade criada com sucesso!");
       setIsCreateActivityDialogOpen(false);
@@ -198,12 +206,47 @@ const ProjectDetail = () => {
 
   const handleUpdateActivity = async (data: Partial<ProjectActivity> & { id: string }) => {
     try {
+      // First, get the current activity to compare changes
+      const { data: currentActivity } = await supabase
+        .from("project_activities")
+        .select("*")
+        .eq("id", data.id)
+        .single();
+
       const { error } = await supabase
         .from("project_activities")
         .update(data)
         .eq("id", data.id);
 
       if (error) throw error;
+
+      // Check if status was updated to "Feito"
+      if (data.status === "Feito" && currentActivity?.status !== "Feito" && profile?.id) {
+        // Get the updated activity
+        const { data: updatedActivity } = await supabase
+          .from("project_activities")
+          .select("*")
+          .eq("id", data.id)
+          .single();
+          
+        if (updatedActivity) {
+          await createActivityCompletedNotification(updatedActivity, profile.id);
+        }
+      }
+
+      // Check if responsible was assigned/changed
+      if (data.responsible && data.responsible !== currentActivity?.responsible && profile?.id) {
+        // Get the updated activity
+        const { data: updatedActivity } = await supabase
+          .from("project_activities")
+          .select("*")
+          .eq("id", data.id)
+          .single();
+          
+        if (updatedActivity) {
+          await createActivityAssignedNotification(updatedActivity, profile.id);
+        }
+      }
 
       toast.success("Atividade atualizada com sucesso!");
       queryClient.invalidateQueries({ queryKey: ["project-activities", projectId] });

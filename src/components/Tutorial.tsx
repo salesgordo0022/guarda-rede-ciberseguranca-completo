@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogOverlay } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogOverlay, DialogPortal, DialogTitle, DialogDescription, DialogHeader } from "@/components/ui/dialog";
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -23,7 +23,7 @@ const tutorialSteps: TutorialStep[] = [
   {
     id: 1,
     title: "Bem-vindo ao TaskFlow!",
-    content: "Este é um guia rápido para ajudá-lo a entender como usar o sistema de gerenciamento de tarefas."
+    content: "Este é um guia rápido para ajudá-lo a entender como usar o sistema de gerenciamento de tarefas. O TaskFlow é uma plataforma completa para gerenciar projetos, tarefas e equipes de trabalho."
   },
   {
     id: 2,
@@ -51,12 +51,27 @@ const tutorialSteps: TutorialStep[] = [
   },
   {
     id: 6,
+    title: "Projetos",
+    content: "Gerencie projetos completos com múltiplas atividades, prazos e responsáveis."
+  },
+  {
+    id: 7,
+    title: "Notificações",
+    content: "Receba alertas sobre tarefas criadas, concluídas, atribuídas e com prazos se aproximando."
+  },
+  {
+    id: 8,
     title: "Configurações",
     content: "Personalize o sistema, gerencie departamentos e configure preferências.",
     selector: "[data-tutorial='settings']"
   },
   {
-    id: 7,
+    id: 9,
+    title: "Resumo do Sistema",
+    content: "O TaskFlow ajuda sua equipe a trabalhar de forma mais eficiente:\n\n• Organize tarefas por departamentos e projetos\n• Acompanhe prazos e metas em tempo real\n• Receba notificações importantes\n• Monitore o desempenho da equipe\n• Mantenha tudo documentado e centralizado"
+  },
+  {
+    id: 10,
     title: "Concluído!",
     content: "Você completou o tutorial básico. Agora você está pronto para usar o TaskFlow efetivamente!"
   }
@@ -64,6 +79,11 @@ const tutorialSteps: TutorialStep[] = [
 
 export function Tutorial() {
   const [isOpen, setIsOpen] = useState(false);
+  
+  // Efeito para monitorar mudanças no estado isOpen
+  useEffect(() => {
+    // Monitorando mudanças no estado isOpen
+  }, [isOpen]);
   const [currentStep, setCurrentStep] = useState(0);
   const [completed, setCompleted] = useState(false);
   const [highlightElement, setHighlightElement] = useState<HTMLElement | null>(null);
@@ -164,7 +184,6 @@ export function Tutorial() {
         <span className="text-[15px]">Primeiros Passos</span>
         {completed && <CheckCircle className="h-4 w-4 ml-auto" />}
       </button>
-
       {/* Highlight overlay */}
       {highlightElement && (
         <div 
@@ -182,7 +201,15 @@ export function Tutorial() {
         }
       }}>
         <DialogOverlay className="bg-black/50" />
-        <DialogContent className="max-w-md mx-auto mt-20 rounded-lg p-0 relative z-50">
+        <DialogContent className="max-w-md mx-auto mt-20 rounded-lg p-0 relative z-[9999]">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold sr-only">
+              {currentStepData.title}
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              {currentStepData.content}
+            </DialogDescription>
+          </DialogHeader>
           <Card className="border-0 shadow-none">
             <CardHeader className="relative pb-4">
               <div className="flex justify-between items-center">
