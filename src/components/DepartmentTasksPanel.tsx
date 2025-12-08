@@ -21,23 +21,22 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-interface DepartmentTask {
+interface DepartmentStats {
   department: string;
   department_id?: string;
-  obligations: number;
-  action: number;
-  attention: number;
+  urgent: number;
+  high: number;
+  overdue: number;
   pending: number;
   completed: number;
 }
 
 interface Activity {
   id: string;
-  title: string;
-  responsible: string | null;
+  name: string;
   deadline: string | null;
   status: string;
-  priority: string | null;
+  deadline_status: string | null;
   department_id: string | null;
   department?: {
     id: string;
@@ -49,16 +48,16 @@ const getBadgeColor = (type: string, count: number) => {
   if (count === 0) return "bg-muted text-muted-foreground cursor-default";
 
   switch (type) {
-    case "obligations":
-      return "bg-yellow-500 text-white hover:bg-yellow-600 cursor-pointer transition-colors";
-    case "action":
+    case "urgent":
+      return "bg-red-500 text-white hover:bg-red-600 cursor-pointer transition-colors";
+    case "high":
       return "bg-orange-600 text-white hover:bg-orange-700 cursor-pointer transition-colors";
-    case "attention":
-      return "bg-gray-500 text-white hover:bg-gray-600 cursor-pointer transition-colors";
+    case "overdue":
+      return "bg-yellow-500 text-white hover:bg-yellow-600 cursor-pointer transition-colors";
     case "pending":
-      return "bg-green-500 text-white hover:bg-green-600 cursor-pointer transition-colors";
+      return "bg-blue-500 text-white hover:bg-blue-600 cursor-pointer transition-colors";
     case "completed":
-      return "bg-purple-600 text-white hover:bg-purple-700 cursor-pointer transition-colors";
+      return "bg-green-600 text-white hover:bg-green-700 cursor-pointer transition-colors";
     default:
       return "bg-muted cursor-default";
   }
@@ -66,12 +65,12 @@ const getBadgeColor = (type: string, count: number) => {
 
 const getCategoryLabel = (type: string) => {
   switch (type) {
-    case "obligations":
-      return "Obrigações";
-    case "action":
-      return "Ação";
-    case "attention":
-      return "Atenção";
+    case "urgent":
+      return "Urgente";
+    case "high":
+      return "Alta Prioridade";
+    case "overdue":
+      return "Atrasadas";
     case "pending":
       return "Pendentes";
     case "completed":
@@ -83,52 +82,47 @@ const getCategoryLabel = (type: string) => {
 
 export function DepartmentTasksPanel({ date }: { date?: Date }) {
   const { profile, selectedCompanyId } = useAuth();
-  const [solicitacoesOpen, setSolicitacoesOpen] = useState(true);
+  const [expandedSection, setExpandedSection] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<{
     department: string;
     category: string;
-    tasks: Activity[];
+    activities: Activity[];
   } | null>(null);
 
-  // Buscar atividades do banco de dados (tabela tasks)
+  // Buscar atividades de departamentos
   const { data: activities } = useQuery({
-    queryKey: ["tasks-panel", selectedCompanyId, date],
+    queryKey: ["department-activities-panel", selectedCompanyId, date],
     queryFn: async () => {
       if (!selectedCompanyId) return [];
 
-      let query = supabase
-        .from("tasks")
+      const { data, error } = await supabase
+        .from("department_activities")
         .select(`
           id,
-          title,
-          responsible,
+          name,
           deadline,
           status,
-          priority,
+          deadline_status,
           department_id,
-          department:departments(id, name)
+          department:departments(id, name, company_id)
         `)
-        .eq('company_id', selectedCompanyId)
         .order("deadline");
 
-      if (date) {
-        const dateStr = date.toISOString().split('T')[0];
-        query = query.eq('deadline', dateStr);
-      }
-
-      const { data, error } = await query;
-
       if (error) throw error;
-      return data as Activity[];
+      
+      // Filtrar por empresa
+      return (data || []).filter(
+        (activity: any) => activity.department?.company_id === selectedCompanyId
+      ) as Activity[];
     },
     enabled: !!selectedCompanyId
   });
 
-  // Agrupar atividades por departamento e categoria
-  const getDepartmentStats = (): DepartmentTask[] => {
+  // Agrupar atividades por departamento
+  const getDepartmentStats = (): DepartmentStats[] => {
     if (!activities) return [];
 
-    const departmentMap = new Map<string, DepartmentTask>();
+    const departmentMap = new Map<string, DepartmentStats>();
 
     activities.forEach((activity) => {
       const deptName = activity.department?.name || "Sem Departamento";
@@ -138,9 +132,9 @@ export function DepartmentTasksPanel({ date }: { date?: Date }) {
         departmentMap.set(deptName, {
           department: deptName,
           department_id: deptId,
-          obligations: 0,
-          action: 0,
-          attention: 0,
+          urgent: 0,
+          high: 0,
+          overdue: 0,
           pending: 0,
           completed: 0,
         });
@@ -148,27 +142,14 @@ export function DepartmentTasksPanel({ date }: { date?: Date }) {
 
       const dept = departmentMap.get(deptName)!;
 
-      // Categorizar atividades baseado em status e prioridade
-      if (activity.status === "Feito") {
+      if (activity.status === "concluida") {
         dept.completed++;
-      } else if (activity.priority === "urgente" || activity.priority === "alta") {
-        if (activity.priority === "urgente") {
-          dept.obligations++;
-        } else {
-          dept.action++;
-        }
-      } else if (activity.deadline) {
-        const deadline = new Date(activity.deadline);
-        const today = new Date();
-        const isOverdue = deadline < today && activity.status !== "Feito";
-
-        if (isOverdue) {
-          dept.attention++;
-        } else {
-          dept.pending++;
-        }
-      } else {
+      } else if (activity.deadline_status === "fora_do_prazo") {
+        dept.overdue++;
+      } else if (activity.status === "pendente") {
         dept.pending++;
+      } else if (activity.status === "em_andamento") {
+        dept.high++;
       }
     });
 
@@ -177,7 +158,6 @@ export function DepartmentTasksPanel({ date }: { date?: Date }) {
 
   const departmentStats = getDepartmentStats();
 
-  // Separar departamento principal dos outros
   const mainDepartment = departmentStats.find(
     (d) => d.department_id === profile?.department_id
   );
@@ -185,7 +165,6 @@ export function DepartmentTasksPanel({ date }: { date?: Date }) {
     (d) => d.department_id !== profile?.department_id
   );
 
-  // Usar departamento principal ou primeiro da lista
   const mainDept = mainDepartment || departmentStats[0];
   const subDepartments = mainDepartment ? otherDepartments : departmentStats.slice(1);
 
@@ -196,30 +175,21 @@ export function DepartmentTasksPanel({ date }: { date?: Date }) {
   ) => {
     if (count === 0) return;
 
-    // Filtrar atividades da categoria
-    const filteredTasks = activities?.filter((activity) => {
+    const filteredActivities = activities?.filter((activity) => {
       const deptName = activity.department?.name || "Sem Departamento";
       if (deptName !== department) return false;
 
       switch (category) {
-        case "obligations":
-          return activity.priority === "urgente" && activity.status !== "Feito";
-        case "action":
-          return activity.priority === "alta" && activity.status !== "Feito";
-        case "attention":
-          if (!activity.deadline || activity.status === "Feito") return false;
-          const deadline = new Date(activity.deadline);
-          const today = new Date();
-          return deadline < today;
+        case "urgent":
+          return activity.status === "pendente" && activity.deadline_status === "fora_do_prazo";
+        case "high":
+          return activity.status === "em_andamento";
+        case "overdue":
+          return activity.deadline_status === "fora_do_prazo";
         case "pending":
-          return (
-            activity.status !== "Feito" &&
-            activity.priority !== "urgente" &&
-            activity.priority !== "alta" &&
-            (!activity.deadline || new Date(activity.deadline) >= new Date())
-          );
+          return activity.status === "pendente" && activity.deadline_status !== "fora_do_prazo";
         case "completed":
-          return activity.status === "Feito";
+          return activity.status === "concluida";
         default:
           return false;
       }
@@ -228,9 +198,51 @@ export function DepartmentTasksPanel({ date }: { date?: Date }) {
     setSelectedCategory({
       department,
       category: getCategoryLabel(category),
-      tasks: filteredTasks,
+      activities: filteredActivities,
     });
   };
+
+  const renderDepartmentRow = (dept: DepartmentStats, isMain: boolean = false) => (
+    <div className={`grid grid-cols-6 gap-4 py-2 items-center hover:bg-muted/50 rounded transition-colors ${!isMain ? 'pl-4' : ''}`}>
+      <div className={`font-medium ${!isMain ? 'text-sm text-muted-foreground' : ''} flex items-center gap-2`}>
+        <span className="text-xs">☰</span>
+        {dept.department}
+      </div>
+      <div className="flex justify-center">
+        <Badge
+          className={`${getBadgeColor("overdue", dept.overdue)} min-w-[40px] justify-center ${!isMain ? 'text-xs' : ''}`}
+          onClick={() => handleCategoryClick(dept.department, "overdue", dept.overdue)}
+        >
+          {dept.overdue}
+        </Badge>
+      </div>
+      <div className="flex justify-center">
+        <Badge
+          className={`${getBadgeColor("high", dept.high)} min-w-[40px] justify-center ${!isMain ? 'text-xs' : ''}`}
+          onClick={() => handleCategoryClick(dept.department, "high", dept.high)}
+        >
+          {dept.high}
+        </Badge>
+      </div>
+      <div className="flex justify-center">
+        <Badge
+          className={`${getBadgeColor("pending", dept.pending)} min-w-[40px] justify-center ${!isMain ? 'text-xs' : ''}`}
+          onClick={() => handleCategoryClick(dept.department, "pending", dept.pending)}
+        >
+          {dept.pending}
+        </Badge>
+      </div>
+      <div className="flex justify-center">
+        <Badge
+          className={`${getBadgeColor("completed", dept.completed)} min-w-[40px] justify-center ${!isMain ? 'text-xs' : ''}`}
+          onClick={() => handleCategoryClick(dept.department, "completed", dept.completed)}
+        >
+          {dept.completed}
+        </Badge>
+      </div>
+      <div></div>
+    </div>
+  );
 
   return (
     <>
@@ -239,127 +251,31 @@ export function DepartmentTasksPanel({ date }: { date?: Date }) {
           <div className="mb-6">
             <div className="grid grid-cols-6 gap-4 mb-3 pb-2 border-b">
               <div className="col-span-1"></div>
-              <div className="text-center font-semibold text-sm">Obrigações</div>
-              <div className="text-center font-semibold text-sm">Ação</div>
-              <div className="text-center font-semibold text-sm">Atenção</div>
+              <div className="text-center font-semibold text-sm">Atrasadas</div>
+              <div className="text-center font-semibold text-sm">Em Andamento</div>
               <div className="text-center font-semibold text-sm">Pendentes</div>
               <div className="text-center font-semibold text-sm">Concluídas</div>
+              <div></div>
             </div>
-
-            <div className="grid grid-cols-6 gap-4 py-2 items-center hover:bg-muted/50 rounded transition-colors">
-              <div className="font-medium flex items-center gap-2">
-                <span className="text-xs">☰</span>
-                {mainDept.department}
-              </div>
-              <div className="flex justify-center">
-                <Badge
-                  className={`${getBadgeColor("obligations", mainDept.obligations)} min-w-[40px] justify-center`}
-                  onClick={() => handleCategoryClick(mainDept.department, "obligations", mainDept.obligations)}
-                >
-                  {mainDept.obligations}
-                </Badge>
-              </div>
-              <div className="flex justify-center">
-                <Badge
-                  className={`${getBadgeColor("action", mainDept.action)} min-w-[40px] justify-center`}
-                  onClick={() => handleCategoryClick(mainDept.department, "action", mainDept.action)}
-                >
-                  {mainDept.action}
-                </Badge>
-              </div>
-              <div className="flex justify-center">
-                <Badge
-                  className={`${getBadgeColor("attention", mainDept.attention)} min-w-[40px] justify-center`}
-                  onClick={() => handleCategoryClick(mainDept.department, "attention", mainDept.attention)}
-                >
-                  {mainDept.attention}
-                </Badge>
-              </div>
-              <div className="flex justify-center">
-                <Badge
-                  className={`${getBadgeColor("pending", mainDept.pending)} min-w-[40px] justify-center`}
-                  onClick={() => handleCategoryClick(mainDept.department, "pending", mainDept.pending)}
-                >
-                  {mainDept.pending}
-                </Badge>
-              </div>
-              <div className="flex justify-center">
-                <Badge
-                  className={`${getBadgeColor("completed", mainDept.completed)} min-w-[40px] justify-center`}
-                  onClick={() => handleCategoryClick(mainDept.department, "completed", mainDept.completed)}
-                >
-                  {mainDept.completed}
-                </Badge>
-              </div>
-            </div>
+            {renderDepartmentRow(mainDept, true)}
           </div>
         )}
 
         {subDepartments.length > 0 && (
           <div>
             <button
-              onClick={() => setSolicitacoesOpen(!solicitacoesOpen)}
+              onClick={() => setExpandedSection(!expandedSection)}
               className="w-full mb-3 pb-2 border-b flex items-center justify-between hover:bg-muted/50 rounded px-2 transition-colors"
             >
-              <div className="grid grid-cols-6 gap-4 flex-1">
-                <div className="col-span-1"></div>
-                <div className="text-center font-semibold text-sm">Solicitações</div>
-                <div className="text-center font-semibold text-sm">Ação</div>
-                <div className="text-center font-semibold text-sm">Atenção</div>
-                <div className="text-center font-semibold text-sm">Pendentes</div>
-                <div className="text-center font-semibold text-sm">Concluídas</div>
-              </div>
-              <ChevronDown className={`h-4 w-4 transition-transform ${solicitacoesOpen ? 'rotate-180' : ''}`} />
+              <span className="font-semibold text-sm">Outros Departamentos</span>
+              <ChevronDown className={`h-4 w-4 transition-transform ${expandedSection ? 'rotate-180' : ''}`} />
             </button>
 
-            {solicitacoesOpen && (
+            {expandedSection && (
               <div className="space-y-1 animate-accordion-down">
                 {subDepartments.map((dept, index) => (
-                  <div key={index} className="grid grid-cols-6 gap-4 py-2 items-center hover:bg-muted/50 rounded transition-colors">
-                    <div className="font-medium text-sm text-muted-foreground flex items-center gap-2 pl-4">
-                      <span className="text-xs">☰</span>
-                      {dept.department}
-                    </div>
-                    <div className="flex justify-center">
-                      <Badge
-                        className={`${getBadgeColor("obligations", dept.obligations)} min-w-[40px] justify-center text-xs`}
-                        onClick={() => handleCategoryClick(dept.department, "obligations", dept.obligations)}
-                      >
-                        {dept.obligations}
-                      </Badge>
-                    </div>
-                    <div className="flex justify-center">
-                      <Badge
-                        className={`${getBadgeColor("action", dept.action)} min-w-[40px] justify-center text-xs`}
-                        onClick={() => handleCategoryClick(dept.department, "action", dept.action)}
-                      >
-                        {dept.action}
-                      </Badge>
-                    </div>
-                    <div className="flex justify-center">
-                      <Badge
-                        className={`${getBadgeColor("attention", dept.attention)} min-w-[40px] justify-center text-xs`}
-                        onClick={() => handleCategoryClick(dept.department, "attention", dept.attention)}
-                      >
-                        {dept.attention}
-                      </Badge>
-                    </div>
-                    <div className="flex justify-center">
-                      <Badge
-                        className={`${getBadgeColor("pending", dept.pending)} min-w-[40px] justify-center text-xs`}
-                        onClick={() => handleCategoryClick(dept.department, "pending", dept.pending)}
-                      >
-                        {dept.pending}
-                      </Badge>
-                    </div>
-                    <div className="flex justify-center">
-                      <Badge
-                        className={`${getBadgeColor("completed", dept.completed)} min-w-[40px] justify-center text-xs`}
-                        onClick={() => handleCategoryClick(dept.department, "completed", dept.completed)}
-                      >
-                        {dept.completed}
-                      </Badge>
-                    </div>
+                  <div key={index}>
+                    {renderDepartmentRow(dept, false)}
                   </div>
                 ))}
               </div>
@@ -367,10 +283,11 @@ export function DepartmentTasksPanel({ date }: { date?: Date }) {
           </div>
         )}
 
-        <button className="mt-6 w-full text-left text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center justify-between">
-          <span>Legenda de Tarefas</span>
-          <ChevronDown className="h-4 w-4" />
-        </button>
+        {departmentStats.length === 0 && (
+          <div className="text-center text-muted-foreground py-8">
+            Nenhuma atividade encontrada
+          </div>
+        )}
       </Card>
 
       <Dialog open={!!selectedCategory} onOpenChange={() => setSelectedCategory(null)}>
@@ -380,41 +297,39 @@ export function DepartmentTasksPanel({ date }: { date?: Date }) {
               {selectedCategory?.category} - {selectedCategory?.department}
             </DialogTitle>
             <DialogDescription>
-              {selectedCategory?.tasks.length} atividade(s) encontrada(s)
+              {selectedCategory?.activities.length} atividade(s) encontrada(s)
             </DialogDescription>
           </DialogHeader>
 
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Título</TableHead>
-                <TableHead>Responsável</TableHead>
+                <TableHead>Nome</TableHead>
                 <TableHead>Prazo</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Departamento</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {selectedCategory?.tasks.length === 0 ? (
+              {selectedCategory?.activities.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                  <TableCell colSpan={4} className="text-center text-muted-foreground">
                     Nenhuma atividade encontrada
                   </TableCell>
                 </TableRow>
               ) : (
-                selectedCategory?.tasks.map((task) => (
-                  <TableRow key={task.id}>
-                    <TableCell className="font-medium">{task.title}</TableCell>
-                    <TableCell>{task.responsible || "-"}</TableCell>
+                selectedCategory?.activities.map((activity) => (
+                  <TableRow key={activity.id}>
+                    <TableCell className="font-medium">{activity.name}</TableCell>
                     <TableCell>
-                      {task.deadline
-                        ? new Date(task.deadline).toLocaleDateString("pt-BR")
+                      {activity.deadline
+                        ? new Date(activity.deadline).toLocaleDateString("pt-BR")
                         : "-"}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{task.status}</Badge>
+                      <Badge variant="outline">{activity.status}</Badge>
                     </TableCell>
-                    <TableCell>{task.department?.name || "-"}</TableCell>
+                    <TableCell>{activity.department?.name || "-"}</TableCell>
                   </TableRow>
                 ))
               )}

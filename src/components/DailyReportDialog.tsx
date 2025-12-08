@@ -1,6 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { FileText, TrendingUp, Clock, CheckCircle2, AlertTriangle } from "lucide-react";
+import { FileText, TrendingUp } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,9 +12,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 interface UserProductivity {
     user_id: string;
     full_name: string;
-    total_tasks: number;
-    completed_tasks: number;
-    overdue_tasks: number;
+    total_activities: number;
+    completed_activities: number;
+    overdue_activities: number;
     avg_completion_time_hours: number;
     productivity_score: number;
 }
@@ -27,101 +27,101 @@ export function DailyReportDialog() {
         queryFn: async () => {
             if (!selectedCompanyId) return [];
 
-            // Fetch all tasks for the company
-            const { data: tasks, error } = await supabase
-                .from('tasks')
+            // Buscar atividades de projetos da empresa
+            const { data: activities, error } = await supabase
+                .from('project_activities')
                 .select(`
-          id,
-          status,
-          deadline,
-          completed_at,
-          created_at,
-          responsible,
-          assigned_to
-        `)
-                .eq('company_id', selectedCompanyId);
+                    id,
+                    status,
+                    deadline,
+                    completed_at,
+                    created_at,
+                    created_by,
+                    project:projects(company_id)
+                `);
 
             if (error) throw error;
 
-            // Fetch all profiles for the company (mock or real)
-            // Since we don't have a direct link in profiles to company in mock sometimes, 
-            // we'll infer from tasks or fetch all. Ideally profiles should have company_id.
-            // For now let's get unique assigned users from tasks + profiles table
+            // Filtrar por empresa
+            const companyActivities = (activities || []).filter(
+                (a: any) => a.project?.company_id === selectedCompanyId
+            );
+
+            // Buscar perfis
             const { data: profiles } = await supabase
                 .from('profiles')
                 .select('id, full_name');
 
             const userMap = new Map<string, UserProductivity>();
 
-            // Initialize map with profiles
+            // Inicializar mapa com perfis
             profiles?.forEach(p => {
-                userMap.set(p.full_name || p.id, {
+                userMap.set(p.id, {
                     user_id: p.id,
                     full_name: p.full_name || 'Usuário',
-                    total_tasks: 0,
-                    completed_tasks: 0,
-                    overdue_tasks: 0,
+                    total_activities: 0,
+                    completed_activities: 0,
+                    overdue_activities: 0,
                     avg_completion_time_hours: 0,
                     productivity_score: 0
                 });
             });
 
-            // Process tasks
-            tasks?.forEach(task => {
-                const responsibleName = task.responsible || 'Sem Responsável';
-
-                if (!userMap.has(responsibleName)) {
-                    userMap.set(responsibleName, {
-                        user_id: 'unknown',
-                        full_name: responsibleName,
-                        total_tasks: 0,
-                        completed_tasks: 0,
-                        overdue_tasks: 0,
+            // Processar atividades
+            companyActivities.forEach((activity: any) => {
+                const creatorId = activity.created_by;
+                
+                if (!userMap.has(creatorId)) {
+                    userMap.set(creatorId, {
+                        user_id: creatorId,
+                        full_name: 'Usuário Desconhecido',
+                        total_activities: 0,
+                        completed_activities: 0,
+                        overdue_activities: 0,
                         avg_completion_time_hours: 0,
                         productivity_score: 0
                     });
                 }
 
-                const stats = userMap.get(responsibleName)!;
-                stats.total_tasks++;
+                const stats = userMap.get(creatorId)!;
+                stats.total_activities++;
 
-                if (task.status === 'Feito') {
-                    stats.completed_tasks++;
+                if (activity.status === 'concluida') {
+                    stats.completed_activities++;
 
-                    if (task.completed_at && task.created_at) {
-                        const start = new Date(task.created_at).getTime();
-                        const end = new Date(task.completed_at).getTime();
+                    if (activity.completed_at && activity.created_at) {
+                        const start = new Date(activity.created_at).getTime();
+                        const end = new Date(activity.completed_at).getTime();
                         const hours = (end - start) / (1000 * 60 * 60);
-                        // Running average
                         stats.avg_completion_time_hours =
-                            (stats.avg_completion_time_hours * (stats.completed_tasks - 1) + hours) / stats.completed_tasks;
+                            (stats.avg_completion_time_hours * (stats.completed_activities - 1) + hours) / stats.completed_activities;
                     }
                 }
 
-                if (task.deadline) {
-                    const deadline = new Date(task.deadline);
+                if (activity.deadline) {
+                    const deadline = new Date(activity.deadline);
                     const today = new Date();
-                    // If not done and deadline passed OR done after deadline
-                    if ((task.status !== 'Feito' && deadline < today) ||
-                        (task.status === 'Feito' && task.completed_at && new Date(task.completed_at) > deadline)) {
-                        stats.overdue_tasks++;
+                    if ((activity.status !== 'concluida' && deadline < today) ||
+                        (activity.status === 'concluida' && activity.completed_at && new Date(activity.completed_at) > deadline)) {
+                        stats.overdue_activities++;
                     }
                 }
             });
 
-            // Calculate scores
-            return Array.from(userMap.values()).map(stat => {
-                // Simple score: (completed / total) * 100 - (overdue * 5)
-                const completionRate = stat.total_tasks > 0 ? (stat.completed_tasks / stat.total_tasks) : 0;
-                let score = (completionRate * 100) - (stat.overdue_tasks * 5);
-                if (score < 0) score = 0;
-                if (score > 100) score = 100;
+            // Calcular scores
+            return Array.from(userMap.values())
+                .filter(stat => stat.total_activities > 0)
+                .map(stat => {
+                    const completionRate = stat.total_activities > 0 ? (stat.completed_activities / stat.total_activities) : 0;
+                    let score = (completionRate * 100) - (stat.overdue_activities * 5);
+                    if (score < 0) score = 0;
+                    if (score > 100) score = 100;
 
-                stat.productivity_score = Math.round(score);
-                stat.avg_completion_time_hours = Math.round(stat.avg_completion_time_hours * 10) / 10;
+                    stat.productivity_score = Math.round(score);
+                    stat.avg_completion_time_hours = Math.round(stat.avg_completion_time_hours * 10) / 10;
 
-                return stat;
-            }).sort((a, b) => b.productivity_score - a.productivity_score);
+                    return stat;
+                }).sort((a, b) => b.productivity_score - a.productivity_score);
         },
         enabled: !!selectedCompanyId
     });
@@ -159,24 +159,24 @@ export function DailyReportDialog() {
                         <Card>
                             <CardHeader className="pb-2">
                                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                                    Tarefas Concluídas Hoje
+                                    Atividades Concluídas
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold text-green-600">
-                                    {productivityData ? productivityData.reduce((acc, curr) => acc + curr.completed_tasks, 0) : 0}
+                                    {productivityData ? productivityData.reduce((acc, curr) => acc + curr.completed_activities, 0) : 0}
                                 </div>
                             </CardContent>
                         </Card>
                         <Card>
                             <CardHeader className="pb-2">
                                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                                    Tarefas em Atraso
+                                    Atividades em Atraso
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold text-red-600">
-                                    {productivityData ? productivityData.reduce((acc, curr) => acc + curr.overdue_tasks, 0) : 0}
+                                    {productivityData ? productivityData.reduce((acc, curr) => acc + curr.overdue_activities, 0) : 0}
                                 </div>
                             </CardContent>
                         </Card>
@@ -192,7 +192,7 @@ export function DailyReportDialog() {
                                     <TableRow>
                                         <TableHead>Colaborador</TableHead>
                                         <TableHead className="text-center">Score</TableHead>
-                                        <TableHead className="text-center">Tarefas</TableHead>
+                                        <TableHead className="text-center">Atividades</TableHead>
                                         <TableHead className="text-center">Concluídas</TableHead>
                                         <TableHead className="text-center">Atrasadas</TableHead>
                                         <TableHead className="text-center">Tempo Médio</TableHead>
@@ -223,9 +223,9 @@ export function DailyReportDialog() {
                                                         <span className="text-xs font-bold w-8">{user.productivity_score}%</span>
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="text-center">{user.total_tasks}</TableCell>
-                                                <TableCell className="text-center text-green-600 font-medium">{user.completed_tasks}</TableCell>
-                                                <TableCell className="text-center text-red-600 font-medium">{user.overdue_tasks}</TableCell>
+                                                <TableCell className="text-center">{user.total_activities}</TableCell>
+                                                <TableCell className="text-center text-green-600 font-medium">{user.completed_activities}</TableCell>
+                                                <TableCell className="text-center text-red-600 font-medium">{user.overdue_activities}</TableCell>
                                                 <TableCell className="text-center text-muted-foreground">
                                                     {user.avg_completion_time_hours > 0 ? `${user.avg_completion_time_hours}h` : '-'}
                                                 </TableCell>
