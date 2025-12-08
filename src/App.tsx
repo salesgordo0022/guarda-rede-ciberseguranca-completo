@@ -121,6 +121,7 @@ const App = () => {
               <Sonner />
               <ThemeApplicator />
               <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+                <LoginBar />
                 <Routes>
                   <Route path="/auth" element={<Auth />} />
                   <Route
@@ -128,7 +129,6 @@ const App = () => {
                     element={
                       <ProtectedRoute>
                         <div className="relative min-h-screen flex w-full">
-                          <LoginBar />
                           <SidebarProvider>
                             <div className="flex w-full">
                               <AppSidebar />
