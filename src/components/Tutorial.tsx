@@ -202,7 +202,7 @@ export function Tutorial() {
                 <div className="h-1 bg-muted rounded-full overflow-hidden">
                   <div 
                     className="h-full bg-primary transition-all duration-300"
-                    style={{ width: "" + (((currentStep + 1) / tutorialSteps.length) * 100) + "%" }}
+                    style={{ width: `${((currentStep + 1) / tutorialSteps.length) * 100}%` }}
                   />
                 </div>
               </div>
@@ -226,8 +226,8 @@ export function Tutorial() {
                   <button
                     key={index}
                     onClick={() => goToStep(index)}
-                    className={"w-2 h-2 rounded-full " + (index === currentStep ? "bg-primary" : "bg-muted")}
-                    aria-label={"Ir para o passo " + (index + 1)}
+                    className={`w-2 h-2 rounded-full ${index === currentStep ? "bg-primary" : "bg-muted"}`}
+                    aria-label={`Ir para o passo ${index + 1}`}
                   ></button>
                 ))}
               </div>
