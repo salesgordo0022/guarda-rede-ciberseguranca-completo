@@ -147,16 +147,20 @@ const Settings = () => {
     });
 
     // Mutation para criar departamento
+    const { user } = useAuth();
+    
     const createDepartmentMutation = useMutation({
         mutationFn: async (values: z.infer<typeof departmentSchema>) => {
             if (!selectedCompanyId) throw new Error("Nenhuma empresa selecionada");
+            if (!user?.id) throw new Error("Usuário não autenticado");
 
             const { data, error } = await supabase
                 .from("departments")
                 .insert({
                     name: values.name,
                     description: values.description || null,
-                    company_id: selectedCompanyId
+                    company_id: selectedCompanyId,
+                    created_by: user.id
                 })
                 .select()
                 .single();

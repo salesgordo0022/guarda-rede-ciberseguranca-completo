@@ -1,8 +1,5 @@
-// Importações de bibliotecas e dependências
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-
-// Importações de componentes de UI
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,221 +9,189 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-
-// Importações de utilitários
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useAuth } from "@/hooks/useAuth";
 
-// Interface que define a estrutura de uma tarefa
-interface Task {
-  id: string;                                   // Identificador único da tarefa
-  title: string;                                // Título/descrição da tarefa
-  responsible: string | null;                   // Pessoa responsável pela tarefa (ou null)
-  status: "Em andamento" | "Feito" | "Parado" | "Não iniciado"; // Status atual da tarefa
-  deadline: string | null;                      // Data limite para conclusão (ou null)
-  schedule_start: string | null;                // Data de início planejada (ou null)
-  schedule_end: string | null;                  // Data de término planejada (ou null)
-  schedule_status: "Dentro do prazo" | "Atrasado" | null; // Status em relação ao cronograma
-  updated_at: string;                           // Data da última atualização
-  created_at: string;                           // Data de criação da tarefa
+type ActivityStatus = "pendente" | "em_andamento" | "concluida" | "cancelada";
+
+interface Activity {
+  id: string;
+  name: string;
+  description: string | null;
+  status: ActivityStatus;
+  deadline: string | null;
+  scheduled_date: string | null;
+  deadline_status: string | null;
+  updated_at: string;
+  created_at: string;
+  project_id: string;
 }
 
-// Objeto que mapeia status de tarefas para classes CSS de cores
-const statusColors = {
-  "Em andamento": "bg-blue-500 text-white",    // Azul para tarefas em andamento
-  "Feito": "bg-green-500 text-white",         // Verde para tarefas concluídas
-  "Parado": "bg-red-500 text-white",          // Vermelho para tarefas paradas
-  "Não iniciado": "bg-gray-500 text-white",   // Cinza para tarefas não iniciadas
+const statusColors: Record<ActivityStatus, string> = {
+  "em_andamento": "bg-blue-500 text-white",
+  "concluida": "bg-green-500 text-white",
+  "cancelada": "bg-red-500 text-white",
+  "pendente": "bg-gray-500 text-white",
 };
 
-// Componente principal da página de gerenciamento de tarefas
+const statusLabels: Record<ActivityStatus, string> = {
+  "pendente": "Pendente",
+  "em_andamento": "Em Andamento",
+  "concluida": "Concluída",
+  "cancelada": "Cancelada",
+};
+
 const Tasks = () => {
-  // Estados para gerenciar as tarefas e o formulário
-  const [tasks, setTasks] = useState<Task[]>([]);           // Lista de tarefas
-  const [open, setOpen] = useState(false);                  // Controle de abertura do diálogo
-  const [editing, setEditing] = useState<Task | null>(null); // Tarefa sendo editada (ou null)
+  const { selectedCompanyId, user } = useAuth();
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<Activity | null>(null);
 
-  // Estados para os campos do formulário
-  const [title, setTitle] = useState("");                  // Título da tarefa
-  const [responsible, setResponsible] = useState("");      // Responsável pela tarefa
-  const [status, setStatus] = useState<Task["status"]>("Não iniciado"); // Status da tarefa
-  const [deadline, setDeadline] = useState("");            // Prazo da tarefa
-  const [scheduleStart, setScheduleStart] = useState("");  // Início do cronograma
-  const [scheduleEnd, setScheduleEnd] = useState("");      // Fim do cronograma
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [status, setStatus] = useState<ActivityStatus>("pendente");
+  const [deadline, setDeadline] = useState("");
+  const [projectId, setProjectId] = useState("");
 
-  // Efeito para carregar as tarefas quando o componente é montado
   useEffect(() => {
-    fetchTasks();
-  }, []); // Array de dependências vazio significa que só executa uma vez
+    if (selectedCompanyId) {
+      fetchActivities();
+      fetchProjects();
+    }
+  }, [selectedCompanyId]);
 
-  // Função assíncrona para buscar tarefas do banco de dados
-  const fetchTasks = async () => {
-    // Consulta todas as tarefas ordenadas pela data de criação (mais recentes primeiro)
+  const fetchProjects = async () => {
+    if (!selectedCompanyId) return;
     const { data, error } = await supabase
-      .from("tasks")
+      .from("projects")
+      .select("id, name")
+      .eq("company_id", selectedCompanyId)
+      .order("name");
+
+    if (error) {
+      toast.error("Erro ao carregar projetos");
+      return;
+    }
+    setProjects(data || []);
+  };
+
+  const fetchActivities = async () => {
+    if (!selectedCompanyId) return;
+
+    const { data: projectIds } = await supabase
+      .from("projects")
+      .select("id")
+      .eq("company_id", selectedCompanyId);
+
+    if (!projectIds || projectIds.length === 0) {
+      setActivities([]);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("project_activities")
       .select("*")
+      .in("project_id", projectIds.map(p => p.id))
       .order("created_at", { ascending: false });
 
-    // Trata erros na consulta
     if (error) {
-      toast.error("Erro ao carregar tarefas");
+      toast.error("Erro ao carregar atividades");
       return;
     }
 
-    // Atualiza o estado com as tarefas obtidas (ou array vazio se null)
-    setTasks(data || []);
+    setActivities(data || []);
   };
 
-  // Função para calcular o status do cronograma com base nas datas
-  const calculateScheduleStatus = (deadline: string | null, scheduleEnd: string | null): Task["schedule_status"] => {
-    // Retorna null se alguma das datas não estiver definida
-    if (!deadline || !scheduleEnd) return null;
-
-    // Converte strings para objetos Date
-    const deadlineDate = new Date(deadline);
-    const scheduleEndDate = new Date(scheduleEnd);
-    const today = new Date();
-
-    // Verifica se hoje ultrapassou alguma das datas
-    if (today > deadlineDate || today > scheduleEndDate) {
-      return "Atrasado";
-    }
-    // Caso contrário, está dentro do prazo
-    return "Dentro do prazo";
-  };
-
-  // Função para lidar com o envio do formulário (criar ou atualizar tarefa)
   const handleSubmit = async (e: React.FormEvent) => {
-    // Previne o comportamento padrão do formulário
     e.preventDefault();
 
-    // Calcula o status do cronograma
-    const scheduleStatus = calculateScheduleStatus(deadline, scheduleEnd);
-
-    // Prepara os dados da tarefa
-    const taskData = {
-      title,
-      responsible: responsible || null,
-      status,
-      deadline: deadline || null,
-      schedule_start: scheduleStart || null,
-      schedule_end: scheduleEnd || null,
-      schedule_status: scheduleStatus,
-    };
-
-    // Se estiver editando uma tarefa existente
-    if (editing) {
-      // Atualiza a tarefa no banco de dados
-      const { error } = await supabase
-        .from("tasks")
-        .update(taskData)
-        .eq("id", editing.id);
-
-      // Trata erros na atualização
-      if (error) {
-        toast.error("Erro ao atualizar tarefa");
-        return;
-      }
-
-      // Exibe mensagem de sucesso
-      toast.success("Tarefa atualizada!");
-    } else {
-      // Cria uma nova tarefa no banco de dados
-      const { error } = await supabase.from("tasks").insert(taskData);
-
-      // Trata erros na criação
-      if (error) {
-        toast.error("Erro ao criar tarefa");
-        return;
-      }
-
-      // Exibe mensagem de sucesso
-      toast.success("Tarefa criada!");
-    }
-
-    // Fecha o diálogo e reseta o formulário
-    setOpen(false);
-    resetForm();
-    // Atualiza a lista de tarefas
-    fetchTasks();
-  };
-
-  // Função para preparar a edição de uma tarefa existente
-  const handleEdit = (task: Task) => {
-    setEditing(task);                           // Define a tarefa que será editada
-    setTitle(task.title);                       // Preenche o campo título
-    setResponsible(task.responsible || "");    // Preenche o campo responsável
-    setStatus(task.status);                     // Preenche o campo status
-    setDeadline(task.deadline || "");          // Preenche o campo prazo
-    setScheduleStart(task.schedule_start || ""); // Preenche o campo início do cronograma
-    setScheduleEnd(task.schedule_end || "");   // Preenche o campo fim do cronograma
-    setOpen(true);                              // Abre o diálogo de edição
-  };
-
-  // Função assíncrona para excluir uma tarefa
-  const handleDelete = async (id: string) => {
-    // Confirma com o usuário antes de excluir
-    if (!confirm("Tem certeza que deseja excluir esta tarefa?")) return;
-
-    // Exclui a tarefa do banco de dados
-    const { error } = await supabase.from("tasks").delete().eq("id", id);
-
-    // Trata erros na exclusão
-    if (error) {
-      toast.error("Erro ao excluir tarefa");
+    if (!projectId) {
+      toast.error("Selecione um projeto");
       return;
     }
 
-    // Exibe mensagem de sucesso
-    toast.success("Tarefa excluída!");
-    // Atualiza a lista de tarefas
-    fetchTasks();
-  };
+    const activityData = {
+      name,
+      description: description || null,
+      status,
+      deadline: deadline || null,
+      project_id: projectId,
+      created_by: user?.id || "",
+    };
 
-  // Função para resetar todos os campos do formulário
-  const resetForm = () => {
-    setTitle("");              // Limpa o campo título
-    setResponsible("");        // Limpa o campo responsável
-    setStatus("Não iniciado");  // Reseta o status para o valor padrão
-    setDeadline("");           // Limpa o campo prazo
-    setScheduleStart("");      // Limpa o campo início do cronograma
-    setScheduleEnd("");        // Limpa o campo fim do cronograma
-    setEditing(null);           // Limpa a tarefa que estava sendo editada
-  };
+    if (editing) {
+      const { error } = await supabase
+        .from("project_activities")
+        .update({
+          name,
+          description: description || null,
+          status,
+          deadline: deadline || null,
+        })
+        .eq("id", editing.id);
 
-  // Função para formatar o período do cronograma
-  const formatSchedule = (start: string | null, end: string | null) => {
-    // Retorna traço se alguma das datas não estiver definida
-    if (!start || !end) return "—";
+      if (error) {
+        toast.error("Erro ao atualizar atividade");
+        return;
+      }
+      toast.success("Atividade atualizada!");
+    } else {
+      const { error } = await supabase.from("project_activities").insert(activityData);
 
-    try {
-      // Converte strings para objetos Date
-      const startDate = new Date(start);
-      const endDate = new Date(end);
-
-      // Formata as datas usando date-fns com localização em português
-      const startFormatted = format(startDate, "MMM d", { locale: ptBR });
-      const endFormatted = format(endDate, "d", { locale: ptBR });
-
-      // Retorna o período formatado
-      return `${startFormatted}–${endFormatted}`;
-    } catch {
-      // Retorna traço em caso de erro
-      return "—";
+      if (error) {
+        toast.error("Erro ao criar atividade");
+        return;
+      }
+      toast.success("Atividade criada!");
     }
+
+    setOpen(false);
+    resetForm();
+    fetchActivities();
   };
 
-  // Função para formatar a data da última atualização
+  const handleEdit = (activity: Activity) => {
+    setEditing(activity);
+    setName(activity.name);
+    setDescription(activity.description || "");
+    setStatus(activity.status);
+    setDeadline(activity.deadline || "");
+    setProjectId(activity.project_id);
+    setOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Tem certeza que deseja excluir esta atividade?")) return;
+
+    const { error } = await supabase.from("project_activities").delete().eq("id", id);
+
+    if (error) {
+      toast.error("Erro ao excluir atividade");
+      return;
+    }
+    toast.success("Atividade excluída!");
+    fetchActivities();
+  };
+
+  const resetForm = () => {
+    setName("");
+    setDescription("");
+    setStatus("pendente");
+    setDeadline("");
+    setProjectId("");
+    setEditing(null);
+  };
+
   const formatLastUpdate = (date: string) => {
     try {
-      // Retorna a distância relativa até agora com sufixo ("há X minutos", etc.)
       return formatDistanceToNow(new Date(date), {
-        addSuffix: true,    // Adiciona sufixo como "há" ou "atrás"
-        locale: ptBR        // Usa localização em português
+        addSuffix: true,
+        locale: ptBR
       });
     } catch {
-      // Retorna traço em caso de erro
       return "—";
     }
   };
@@ -235,8 +200,8 @@ const Tasks = () => {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Tarefas</h1>
-          <p className="text-muted-foreground">Gerencie suas tarefas e acompanhe o progresso</p>
+          <h1 className="text-3xl font-bold">Atividades</h1>
+          <p className="text-muted-foreground">Gerencie as atividades dos projetos</p>
         </div>
 
         <Dialog open={open} onOpenChange={(isOpen) => {
@@ -246,81 +211,75 @@ const Tasks = () => {
           <DialogTrigger asChild>
             <Button className="bg-primary">
               <Plus className="h-4 w-4 mr-2" />
-              Nova Tarefa
+              Nova Atividade
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>
-                {editing ? "Editar Tarefa" : "Nova Tarefa"}
+                {editing ? "Editar Atividade" : "Nova Atividade"}
               </DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="title">Tarefa *</Label>
+                <Label htmlFor="project">Projeto *</Label>
+                <Select value={projectId} onValueChange={setProjectId} required>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o projeto" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="name">Nome *</Label>
                 <Input
-                  id="title"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Nome da tarefa"
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Nome da atividade"
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="responsible">Responsável</Label>
+                <Label htmlFor="description">Descrição</Label>
                 <Input
-                  id="responsible"
-                  value={responsible}
-                  onChange={(e) => setResponsible(e.target.value)}
-                  placeholder="Nome da pessoa responsável"
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Descrição da atividade"
                 />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="status">Status *</Label>
-                <Select value={status} onValueChange={(value) => setStatus(value as Task["status"])} required>
+                <Select value={status} onValueChange={(value) => setStatus(value as ActivityStatus)} required>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione o status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Não iniciado">Não iniciado</SelectItem>
-                    <SelectItem value="Em andamento">Em andamento</SelectItem>
-                    <SelectItem value="Parado">Parado</SelectItem>
-                    <SelectItem value="Feito">Feito</SelectItem>
+                    <SelectItem value="pendente">Pendente</SelectItem>
+                    <SelectItem value="em_andamento">Em Andamento</SelectItem>
+                    <SelectItem value="concluida">Concluída</SelectItem>
+                    <SelectItem value="cancelada">Cancelada</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="deadline">Prazo</Label>
-                  <Input
-                    id="deadline"
-                    type="date"
-                    value={deadline}
-                    onChange={(e) => setDeadline(e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="schedule_start">Início do Cronograma</Label>
-                  <Input
-                    id="schedule_start"
-                    type="date"
-                    value={scheduleStart}
-                    onChange={(e) => setScheduleStart(e.target.value)}
-                  />
-                </div>
-              </div>
-
               <div className="space-y-2">
-                <Label htmlFor="schedule_end">Fim do Cronograma</Label>
+                <Label htmlFor="deadline">Prazo</Label>
                 <Input
-                  id="schedule_end"
+                  id="deadline"
                   type="date"
-                  value={scheduleEnd}
-                  onChange={(e) => setScheduleEnd(e.target.value)}
+                  value={deadline}
+                  onChange={(e) => setDeadline(e.target.value)}
                 />
               </div>
 
@@ -334,62 +293,48 @@ const Tasks = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Lista de Tarefas</CardTitle>
+          <CardTitle>Lista de Atividades</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Tarefa</TableHead>
-                <TableHead>Responsável</TableHead>
+                <TableHead>Nome</TableHead>
+                <TableHead>Descrição</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Prazo</TableHead>
-                <TableHead>Cronograma</TableHead>
-                <TableHead>Situação do Cronograma</TableHead>
                 <TableHead>Última Atualização</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {tasks.length === 0 ? (
+              {activities.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                    Nenhuma tarefa cadastrada. Clique em "Nova Tarefa" para começar.
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                    Nenhuma atividade cadastrada. Clique em "Nova Atividade" para começar.
                   </TableCell>
                 </TableRow>
               ) : (
-                tasks.map((task) => (
-                  <TableRow key={task.id}>
-                    <TableCell className="font-medium">{task.title}</TableCell>
-                    <TableCell>{task.responsible || "—"}</TableCell>
+                activities.map((activity) => (
+                  <TableRow key={activity.id}>
+                    <TableCell className="font-medium">{activity.name}</TableCell>
+                    <TableCell>{activity.description || "—"}</TableCell>
                     <TableCell>
-                      <Badge className={statusColors[task.status]}>
-                        {task.status}
+                      <Badge className={statusColors[activity.status]}>
+                        {statusLabels[activity.status]}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {task.deadline ? format(new Date(task.deadline), "dd/MM", { locale: ptBR }) : "—"}
-                    </TableCell>
-                    <TableCell>
-                      {formatSchedule(task.schedule_start, task.schedule_end)}
-                    </TableCell>
-                    <TableCell>
-                      {task.schedule_status === "Dentro do prazo" && (
-                        <span className="text-green-600">✔ Dentro do prazo</span>
-                      )}
-                      {task.schedule_status === "Atrasado" && (
-                        <span className="text-red-600">❗ Atrasado</span>
-                      )}
-                      {!task.schedule_status && "—"}
+                      {activity.deadline ? format(new Date(activity.deadline), "dd/MM/yyyy", { locale: ptBR }) : "—"}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {formatLastUpdate(task.updated_at)}
+                      {formatLastUpdate(activity.updated_at)}
                     </TableCell>
                     <TableCell className="text-right space-x-2">
-                      <Button variant="ghost" size="sm" onClick={() => handleEdit(task)}>
+                      <Button variant="ghost" size="sm" onClick={() => handleEdit(activity)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(task.id)}>
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(activity.id)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </TableCell>

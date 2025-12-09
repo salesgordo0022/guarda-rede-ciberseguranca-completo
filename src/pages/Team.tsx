@@ -39,17 +39,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 interface TeamMember {
   id: string;
   full_name: string;
+  email: string;
   role: "admin" | "gestor" | "colaborador";
-  department_id: string | null;
-  department?: {
-    id: string;
-    name: string;
-  };
-  email?: string;
+  department_name: string | null;
 }
 
 const getRoleInfo = (role: string) => {
@@ -57,21 +54,21 @@ const getRoleInfo = (role: string) => {
     case "admin":
       return {
         label: "Admin",
-        description: "Acesso total a todos os departamentos e visão diversificada de cada departamento e suas atividades, podendo ver cada demanda e suas informações.",
+        description: "Acesso total a todos os departamentos e visão diversificada de cada departamento e suas atividades.",
         color: "bg-red-600 text-white",
         icon: Shield,
       };
     case "gestor":
       return {
         label: "Gestor",
-        description: "Acesso total apenas ao seu próprio departamento, podendo visualizar todas as atividades e demandas do seu setor.",
+        description: "Acesso total apenas ao seu próprio departamento.",
         color: "bg-blue-600 text-white",
         icon: UserCog,
       };
     case "colaborador":
       return {
         label: "Colaborador",
-        description: "Acesso apenas às tarefas que estão envolvidas dentro do seu departamento ou as que foram atribuídas diretamente a ele.",
+        description: "Acesso às tarefas atribuídas ao seu departamento.",
         color: "bg-green-600 text-white",
         icon: UserIcon,
       };
@@ -94,12 +91,11 @@ const getInitials = (name: string) => {
     .slice(0, 2);
 };
 
-// Schema de validação para criação de usuário
 const createUserSchema = z.object({
   firstName: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
   lastName: z.string().min(2, "Sobrenome deve ter pelo menos 2 caracteres"),
   email: z.string().email("Email inválido"),
-  department_id: z.string().min(1, "Selecione um departamento"),
+  department_id: z.string().optional(),
   role: z.enum(["admin", "gestor", "colaborador"], {
     required_error: "Selecione um tipo de usuário",
   }),
@@ -109,8 +105,8 @@ const Team = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const { selectedCompanyId } = useAuth();
 
-  // Form
   const form = useForm<z.infer<typeof createUserSchema>>({
     resolver: zodResolver(createUserSchema),
     defaultValues: {
@@ -122,80 +118,116 @@ const Team = () => {
     },
   });
 
-  // Buscar departamentos
   const { data: departments } = useQuery({
-    queryKey: ["departments"],
+    queryKey: ["departments", selectedCompanyId],
     queryFn: async () => {
+      if (!selectedCompanyId) return [];
       const { data, error } = await supabase
         .from("departments")
         .select("*")
+        .eq("company_id", selectedCompanyId)
         .order("name");
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 
-  // Buscar membros da equipe do banco de dados
   const { data: teamMembers, isLoading, error } = useQuery({
-    queryKey: ["team-members"],
+    queryKey: ["team-members", selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      if (!selectedCompanyId) return [];
+
+      // Get users in this company
+      const { data: userCompanies, error: ucError } = await supabase
+        .from("user_companies")
+        .select("user_id, role")
+        .eq("company_id", selectedCompanyId);
+
+      if (ucError) throw ucError;
+      if (!userCompanies || userCompanies.length === 0) return [];
+
+      const userIds = userCompanies.map(uc => uc.user_id);
+
+      // Get profiles
+      const { data: profiles, error: pError } = await supabase
         .from("profiles")
-        .select(`
-          id,
-          full_name,
-          role,
-          department_id,
-          department:departments(id, name)
-        `)
-        .order("full_name");
+        .select("id, full_name, email")
+        .in("id", userIds);
 
-      if (error) throw error;
-      return data as TeamMember[];
+      if (pError) throw pError;
+
+      // Get user departments
+      const { data: userDepts, error: udError } = await supabase
+        .from("user_departments")
+        .select("user_id, department_id, departments(name)")
+        .in("user_id", userIds);
+
+      if (udError) throw udError;
+
+      // Combine data
+      const members: TeamMember[] = profiles?.map(profile => {
+        const uc = userCompanies.find(u => u.user_id === profile.id);
+        const ud = userDepts?.find(u => u.user_id === profile.id);
+        return {
+          id: profile.id,
+          full_name: profile.full_name,
+          email: profile.email,
+          role: (uc?.role || "colaborador") as TeamMember["role"],
+          department_name: (ud?.departments as any)?.name || null,
+        };
+      }) || [];
+
+      return members;
     },
+    enabled: !!selectedCompanyId,
   });
 
-  // Buscar emails dos usuários
-  const { data: users } = useQuery({
-    queryKey: ["auth-users"],
-    queryFn: async () => {
-      const { data: { users }, error } = await supabase.auth.admin.listUsers();
-      if (error) throw error;
-      return users;
-    },
-  });
-
-  // Mutation para criar usuário
   const createUserMutation = useMutation({
     mutationFn: async (values: z.infer<typeof createUserSchema>) => {
-      // 1. Criar usuário no Auth
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      if (!selectedCompanyId) throw new Error("Nenhuma empresa selecionada");
+
+      // Create user in Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email: values.email,
-        email_confirm: true,
-        user_metadata: {
-          full_name: `${values.firstName} ${values.lastName}`,
+        password: Math.random().toString(36).slice(-12),
+        options: {
+          data: {
+            full_name: `${values.firstName} ${values.lastName}`,
+          },
         },
       });
 
       if (authError) throw authError;
+      if (!authData.user) throw new Error("Falha ao criar usuário");
 
-      // 2. Criar/atualizar perfil
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .upsert({
-          id: authData.user.id,
-          full_name: `${values.firstName} ${values.lastName}`,
-          department_id: values.department_id,
+      // Add to company
+      const { error: companyError } = await supabase
+        .from("user_companies")
+        .insert({
+          user_id: authData.user.id,
+          company_id: selectedCompanyId,
           role: values.role,
         });
 
-      if (profileError) throw profileError;
+      if (companyError) throw companyError;
+
+      // Add to department if selected
+      if (values.department_id) {
+        const { error: deptError } = await supabase
+          .from("user_departments")
+          .insert({
+            user_id: authData.user.id,
+            department_id: values.department_id,
+          });
+
+        if (deptError) throw deptError;
+      }
 
       return authData.user;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["team-members"] });
-      queryClient.invalidateQueries({ queryKey: ["auth-users"] });
       toast({
         title: "Usuário criado com sucesso!",
         description: "O novo membro foi adicionado à equipe.",
@@ -216,16 +248,6 @@ const Team = () => {
     createUserMutation.mutate(values);
   };
 
-  // Combinar dados de profiles com emails
-  const membersWithEmails = teamMembers?.map((member) => {
-    const user = users?.find((u) => u.id === member.id);
-    return {
-      ...member,
-      email: user?.email,
-    };
-  });
-
-  // Estatísticas
   const stats = {
     total: teamMembers?.length || 0,
     admins: teamMembers?.filter((m) => m.role === "admin").length || 0,
@@ -257,7 +279,7 @@ const Team = () => {
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            Erro ao carregar membros da equipe: {error.message}
+            Erro ao carregar membros da equipe: {(error as Error).message}
           </AlertDescription>
         </Alert>
       </div>
@@ -434,36 +456,36 @@ const Team = () => {
           </CardContent>
         </Card>
 
-        <Card className="border-red-200 bg-red-50/50">
+        <Card className="border-red-200 bg-red-50/50 dark:bg-red-950/20">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-red-700">
+            <CardTitle className="text-sm font-medium text-red-700 dark:text-red-400">
               Administradores
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-red-700">{stats.admins}</div>
+            <div className="text-3xl font-bold text-red-700 dark:text-red-400">{stats.admins}</div>
           </CardContent>
         </Card>
 
-        <Card className="border-blue-200 bg-blue-50/50">
+        <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-blue-700">
+            <CardTitle className="text-sm font-medium text-blue-700 dark:text-blue-400">
               Gestores
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-blue-700">{stats.gestores}</div>
+            <div className="text-3xl font-bold text-blue-700 dark:text-blue-400">{stats.gestores}</div>
           </CardContent>
         </Card>
 
-        <Card className="border-green-200 bg-green-50/50">
+        <Card className="border-green-200 bg-green-50/50 dark:bg-green-950/20">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-green-700">
+            <CardTitle className="text-sm font-medium text-green-700 dark:text-green-400">
               Colaboradores
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-green-700">{stats.colaboradores}</div>
+            <div className="text-3xl font-bold text-green-700 dark:text-green-400">{stats.colaboradores}</div>
           </CardContent>
         </Card>
       </div>
@@ -497,53 +519,34 @@ const Team = () => {
       <div>
         <h2 className="text-2xl font-bold mb-4">Membros da Equipe</h2>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {membersWithEmails?.map((member) => {
+          {teamMembers?.map((member) => {
             const roleInfo = getRoleInfo(member.role);
             const Icon = roleInfo.icon;
             return (
-              <Card
-                key={member.id}
-                className="hover:shadow-lg transition-all hover-scale cursor-pointer animate-fade-in"
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-12 w-12">
-                        <AvatarImage
-                          src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${member.full_name}`}
-                        />
-                        <AvatarFallback>{getInitials(member.full_name)}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <CardTitle className="text-lg">{member.full_name}</CardTitle>
-                        <p className="text-sm text-muted-foreground">
-                          {member.department?.name || "Sem departamento"}
-                        </p>
+              <Card key={member.id} className="hover:shadow-lg transition-shadow">
+                <CardContent className="pt-6">
+                  <div className="flex items-start gap-4">
+                    <Avatar className="h-12 w-12">
+                      <AvatarFallback className="bg-primary/10 text-primary">
+                        {getInitials(member.full_name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold truncate">{member.full_name}</h3>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                        <Mail className="h-3 w-3" />
+                        <span className="truncate">{member.email}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge className={roleInfo.color}>
+                          <Icon className="h-3 w-3 mr-1" />
+                          {roleInfo.label}
+                        </Badge>
+                        {member.department_name && (
+                          <Badge variant="outline">{member.department_name}</Badge>
+                        )}
                       </div>
                     </div>
-                    <Badge className={roleInfo.color}>
-                      <Icon className="h-3 w-3 mr-1" />
-                      {roleInfo.label}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {member.email && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Mail className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground truncate">{member.email}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2 text-sm">
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">
-                      {member.department?.name || "Sem departamento"}
-                    </span>
-                  </div>
-                  <div className="pt-2 border-t">
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      {roleInfo.description}
-                    </p>
                   </div>
                 </CardContent>
               </Card>
@@ -551,57 +554,6 @@ const Team = () => {
           })}
         </div>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Níveis de Permissão</CardTitle>
-          <CardDescription>
-            Entenda o que cada tipo de usuário pode fazer no sistema
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex items-start gap-3">
-              <Badge className="bg-red-600 text-white mt-1">
-                <Shield className="h-3 w-3 mr-1" />
-                Admin
-              </Badge>
-              <div className="flex-1">
-                <p className="font-medium">Administrador</p>
-                <p className="text-sm text-muted-foreground">
-                  Acesso total a todos os departamentos e visão diversificada de cada departamento e suas atividades, podendo ver cada demanda e suas informações.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <Badge className="bg-blue-600 text-white mt-1">
-                <UserCog className="h-3 w-3 mr-1" />
-                Gestor
-              </Badge>
-              <div className="flex-1">
-                <p className="font-medium">Gestor de Departamento</p>
-                <p className="text-sm text-muted-foreground">
-                  Acesso total apenas ao seu próprio departamento, podendo visualizar todas as atividades e demandas do seu setor.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <Badge className="bg-green-600 text-white mt-1">
-                <UserIcon className="h-3 w-3 mr-1" />
-                Colaborador
-              </Badge>
-              <div className="flex-1">
-                <p className="font-medium">Colaborador</p>
-                <p className="text-sm text-muted-foreground">
-                  Acesso apenas às tarefas que estão envolvidas dentro do seu departamento ou as que foram atribuídas diretamente a ele.
-                </p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 };
