@@ -8,8 +8,10 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
+type AuthMode = 'login' | 'signup' | 'reset';
+
 const Auth = () => {
-  const [isLogin, setIsLogin] = useState(true);
+  const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -28,15 +30,14 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      if (isLogin) {
+      if (mode === 'login') {
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
-
         if (error) throw error;
-        // O redirecionamento será tratado pelo useEffect quando a sessão mudar
-      } else {
+        
+      } else if (mode === 'signup') {
         const redirectUrl = `${window.location.origin}/`;
         const { error } = await supabase.auth.signUp({
           email,
@@ -48,17 +49,24 @@ const Auth = () => {
             },
           },
         });
-
         if (error) throw error;
         toast.success("Conta criada com sucesso! Você já pode fazer login.");
+        setMode('login');
+        
+      } else if (mode === 'reset') {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/auth`,
+        });
+        if (error) throw error;
+        toast.success("Email de recuperação enviado! Verifique sua caixa de entrada.");
+        setMode('login');
       }
     } catch (error: any) {
       console.error("Erro de autenticação:", error);
       
-      // Mensagens de erro mais amigáveis
       if (error?.code === 'user_already_exists') {
         toast.error("Este email já está cadastrado. Tente fazer login.");
-        setIsLogin(true);
+        setMode('login');
       } else if (error?.code === 'invalid_credentials' || error?.message?.includes('Invalid login credentials')) {
         toast.error("Email ou senha incorretos. Verifique suas credenciais.");
       } else {
@@ -69,20 +77,41 @@ const Auth = () => {
     }
   };
 
+  const getTitle = () => {
+    switch (mode) {
+      case 'login': return 'Entrar';
+      case 'signup': return 'Criar Conta';
+      case 'reset': return 'Recuperar Senha';
+    }
+  };
+
+  const getDescription = () => {
+    switch (mode) {
+      case 'login': return 'Entre com suas credenciais para acessar o sistema.';
+      case 'signup': return 'Preencha os dados para criar sua conta.';
+      case 'reset': return 'Digite seu email para receber o link de recuperação.';
+    }
+  };
+
+  const getButtonText = () => {
+    if (loading) return 'Aguarde...';
+    switch (mode) {
+      case 'login': return 'Entrar';
+      case 'signup': return 'Criar Conta';
+      case 'reset': return 'Enviar Email';
+    }
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background-dark to-primary/10 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-primary/10 p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle className="text-2xl font-bold">
-            {isLogin ? "Entrar" : "Criar Conta"}
-          </CardTitle>
-          <CardDescription>
-            Entre com suas credenciais para acessar o sistema.
-          </CardDescription>
+          <CardTitle className="text-2xl font-bold">{getTitle()}</CardTitle>
+          <CardDescription>{getDescription()}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleAuth} className="space-y-4">
-            {!isLogin && (
+            {mode === 'signup' && (
               <div className="space-y-2">
                 <Label htmlFor="fullName">Nome Completo</Label>
                 <Input
@@ -106,29 +135,68 @@ const Auth = () => {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Senha</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
+            {mode !== 'reset' && (
+              <div className="space-y-2">
+                <Label htmlFor="password">Senha</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                />
+              </div>
+            )}
 
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Aguarde..." : isLogin ? "Entrar" : "Criar Conta"}
+              {getButtonText()}
             </Button>
 
-            <Button
-              type="button"
-              variant="ghost"
-              className="w-full"
-              onClick={() => setIsLogin(!isLogin)}
-            >
-              {isLogin ? "Não tem conta? Cadastre-se" : "Já tem conta? Entre"}
-            </Button>
+            <div className="flex flex-col gap-2">
+              {mode === 'login' && (
+                <>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="w-full"
+                    onClick={() => setMode('signup')}
+                  >
+                    Não tem conta? Cadastre-se
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="w-full text-muted-foreground"
+                    onClick={() => setMode('reset')}
+                  >
+                    Esqueci minha senha
+                  </Button>
+                </>
+              )}
+              
+              {mode === 'signup' && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => setMode('login')}
+                >
+                  Já tem conta? Entre
+                </Button>
+              )}
+              
+              {mode === 'reset' && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => setMode('login')}
+                >
+                  Voltar para login
+                </Button>
+              )}
+            </div>
           </form>
         </CardContent>
       </Card>
