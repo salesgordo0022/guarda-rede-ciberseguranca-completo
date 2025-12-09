@@ -52,9 +52,18 @@ const Auth = () => {
         if (error) throw error;
         toast.success("Conta criada com sucesso! Você já pode fazer login.");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro de autenticação:", error);
-      toast.error((error as Error).message || "Erro ao autenticar");
+      
+      // Mensagens de erro mais amigáveis
+      if (error?.code === 'user_already_exists') {
+        toast.error("Este email já está cadastrado. Tente fazer login.");
+        setIsLogin(true);
+      } else if (error?.code === 'invalid_credentials' || error?.message?.includes('Invalid login credentials')) {
+        toast.error("Email ou senha incorretos. Verifique suas credenciais.");
+      } else {
+        toast.error(error?.message || "Erro ao autenticar");
+      }
     } finally {
       setLoading(false);
     }
