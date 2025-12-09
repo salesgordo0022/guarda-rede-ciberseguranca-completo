@@ -1,11 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogOverlay, DialogPortal, DialogTitle, DialogDescription, DialogHeader } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { 
   ChevronLeft, 
   ChevronRight, 
-  X, 
   Play,
   CheckCircle
 } from "lucide-react";
@@ -15,7 +13,7 @@ interface TutorialStep {
   id: number;
   title: string;
   content: string;
-  selector?: string; // CSS selector for highlighting elements
+  selector?: string;
   position?: "top" | "bottom" | "left" | "right";
 }
 
@@ -79,18 +77,11 @@ const tutorialSteps: TutorialStep[] = [
 
 export function Tutorial() {
   const [isOpen, setIsOpen] = useState(false);
-  
-  // Efeito para monitorar mudanças no estado isOpen
-  useEffect(() => {
-    // Monitorando mudanças no estado isOpen
-  }, [isOpen]);
   const [currentStep, setCurrentStep] = useState(0);
   const [completed, setCompleted] = useState(false);
   const [highlightElement, setHighlightElement] = useState<HTMLElement | null>(null);
-  const highlightRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
-  // Check if tutorial was completed before
   useEffect(() => {
     const tutorialCompleted = localStorage.getItem("tutorial-completed");
     if (tutorialCompleted) {
@@ -98,18 +89,16 @@ export function Tutorial() {
     }
   }, []);
 
-  // Handle element highlighting
   useEffect(() => {
     if (!isOpen) return;
     
     const currentStepData = tutorialSteps[currentStep];
     if (currentStepData.selector) {
-      // Small delay to ensure DOM is updated
       const timer = setTimeout(() => {
         const element = document.querySelector(currentStepData.selector!) as HTMLElement;
         if (element) {
           setHighlightElement(element);
-          scrollToElement(element);
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
         } else {
           setHighlightElement(null);
         }
@@ -120,20 +109,6 @@ export function Tutorial() {
       setHighlightElement(null);
     }
   }, [currentStep, isOpen]);
-
-  const scrollToElement = (element: HTMLElement) => {
-    const rect = element.getBoundingClientRect();
-    const isVisible = (
-      rect.top >= 0 &&
-      rect.left >= 0 &&
-      rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
-      rect.right <= (window.innerWidth || document.documentElement.clientWidth)
-    );
-    
-    if (!isVisible) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-  };
 
   const startTutorial = () => {
     setIsOpen(true);
@@ -167,30 +142,23 @@ export function Tutorial() {
     localStorage.setItem("tutorial-completed", "true");
   };
 
-  const resetTutorial = () => {
-    setCompleted(false);
-    localStorage.removeItem("tutorial-completed");
-  };
-
   const currentStepData = tutorialSteps[currentStep];
 
   return (
     <>
       <button 
         onClick={startTutorial}
-        className="flex items-center gap-3 px-4 py-3 rounded-lg transition-all bg-primary text-primary-foreground hover:bg-primary/90 hover-scale w-full"
+        className="flex items-center gap-3 px-4 py-3 rounded-lg transition-all bg-primary text-primary-foreground hover:bg-primary/90 w-full"
       >
         <Play className="h-5 w-5 flex-shrink-0" />
         <span className="text-[15px]">Primeiros Passos</span>
         {completed && <CheckCircle className="h-4 w-4 ml-auto" />}
       </button>
-      {/* Highlight overlay */}
+
       {highlightElement && (
         <div 
-          className="fixed inset-0 pointer-events-none z-50"
-          style={{
-            background: 'rgba(0, 0, 0, 0.5)'
-          }}
+          className="fixed inset-0 pointer-events-none z-40"
+          style={{ background: 'rgba(0, 0, 0, 0.5)' }}
         />
       )}
 
@@ -200,88 +168,66 @@ export function Tutorial() {
           setHighlightElement(null);
         }
       }}>
-        <DialogOverlay className="bg-black/50" />
-        <DialogContent className="max-w-md mx-auto mt-20 rounded-lg p-0 relative z-[9999]">
+        <DialogContent className="max-w-md z-50">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold sr-only">
+            <DialogTitle className="text-lg font-bold">
               {currentStepData.title}
             </DialogTitle>
-            <DialogDescription className="sr-only">
-              {currentStepData.content}
-            </DialogDescription>
+            <div className="mt-2">
+              <div className="h-1 bg-muted rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-primary transition-all duration-300"
+                  style={{ width: `${((currentStep + 1) / tutorialSteps.length) * 100}%` }}
+                />
+              </div>
+            </div>
           </DialogHeader>
-          <Card className="border-0 shadow-none">
-            <CardHeader className="relative pb-4">
-              <div className="flex justify-between items-center">
-                <CardTitle className="text-lg font-bold">
-                  {currentStepData.title}
-                </CardTitle>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsOpen(false)}
-                  className="h-6 w-6 p-0"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="absolute bottom-0 left-0 right-0">
-                <div className="h-1 bg-muted rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-primary transition-all duration-300"
-                    style={{ width: `${((currentStep + 1) / tutorialSteps.length) * 100}%` }}
-                  />
-                </div>
-              </div>
-            </CardHeader>
+          
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground whitespace-pre-line">
+              {currentStepData.content}
+            </p>
             
-            <CardContent className="py-4">
-              <p className="text-sm text-muted-foreground">
-                {currentStepData.content}
-              </p>
-              
-              {currentStep > 0 && currentStep < tutorialSteps.length - 1 && (
-                <div className="mt-4 p-3 bg-muted rounded-md">
-                  <p className="text-xs text-muted-foreground">
-                    Dica: Clique nos elementos destacados na tela para interagir com eles diretamente.
-                  </p>
-                </div>
+            {currentStep > 0 && currentStep < tutorialSteps.length - 1 && (
+              <div className="mt-4 p-3 bg-muted rounded-md">
+                <p className="text-xs text-muted-foreground">
+                  Dica: Clique nos elementos destacados na tela para interagir com eles diretamente.
+                </p>
+              </div>
+            )}
+            
+            <div className="flex justify-center mt-4 gap-1">
+              {tutorialSteps.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => goToStep(index)}
+                  className={`w-2 h-2 rounded-full transition-colors ${
+                    index === currentStep ? "bg-primary" : "bg-muted hover:bg-muted-foreground/30"
+                  }`}
+                  aria-label={`Ir para o passo ${index + 1}`}
+                />
+              ))}
+            </div>
+          </div>
+          
+          <div className="flex justify-between pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={prevStep}
+              disabled={currentStep === 0}
+              className="gap-2"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Anterior
+            </Button>
+            
+            <Button onClick={nextStep} className="gap-2">
+              {currentStep === tutorialSteps.length - 1 ? "Concluir" : "Próximo"}
+              {currentStep !== tutorialSteps.length - 1 && (
+                <ChevronRight className="h-4 w-4" />
               )}
-              
-              <div className="flex justify-center mt-4 space-x-1">
-                {tutorialSteps.map((_, index) => (
-                  <button
-                    key={index}
-                    onClick={() => goToStep(index)}
-                    className={`w-2 h-2 rounded-full ${index === currentStep ? "bg-primary" : "bg-muted"}`}
-                    aria-label={`Ir para o passo ${index + 1}`}
-                  ></button>
-                ))}
-              </div>
-            </CardContent>
-            
-            <CardFooter className="flex justify-between pt-4">
-              <Button
-                variant="outline"
-                onClick={prevStep}
-                disabled={currentStep === 0}
-                className="gap-2"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Anterior
-              </Button>
-              
-              <Button
-                onClick={nextStep}
-                className="gap-2"
-              >
-                {currentStep === tutorialSteps.length - 1 ? "Concluir" : "Próximo"}
-                {currentStep !== tutorialSteps.length - 1 && (
-                  <ChevronRight className="h-4 w-4" />
-                )}
-              </Button>
-            </CardFooter>
-          </Card>
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </>
