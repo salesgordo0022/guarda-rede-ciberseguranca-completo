@@ -9,7 +9,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ProjectActivitiesTable } from "@/components/ProjectActivitiesTable";
 
 interface Project {
   id: string;
@@ -22,23 +21,18 @@ interface Project {
 interface ProjectActivity {
   id: string;
   project_id: string;
-  title: string;
+  name: string;
   description: string | null;
-  responsible: string | null;
-  department_ids: string[] | null;
   status: string;
-  priority: string;
   deadline: string | null;
-  schedule_start: string | null;
-  schedule_end: string | null;
-  schedule_status: string | null;
+  deadline_status: string | null;
   completed_at: string | null;
   created_at: string;
   updated_at: string;
 }
 
 const Projects = () => {
-  const { profile, isAdmin } = useAuth();
+  const { profile, isAdmin, selectedCompanyId } = useAuth();
   const queryClient = useQueryClient();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -48,33 +42,33 @@ const Projects = () => {
 
   // Fetch projects
   const { data: projects = [], isLoading, error } = useQuery({
-    queryKey: ["projects", profile?.company_id],
+    queryKey: ["projects", selectedCompanyId],
     queryFn: async () => {
-      if (!profile?.company_id) return [];
+      if (!selectedCompanyId) return [];
 
       const { data, error } = await supabase
         .from("projects")
         .select("*")
-        .eq("company_id", profile.company_id)
+        .eq("company_id", selectedCompanyId)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
       return data as Project[];
     },
-    enabled: !!profile?.company_id,
+    enabled: !!selectedCompanyId,
   });
 
   // Fetch all project activities
   const { data: allActivities = [] } = useQuery({
-    queryKey: ["all-project-activities", profile?.company_id],
+    queryKey: ["all-project-activities", selectedCompanyId],
     queryFn: async () => {
-      if (!profile?.company_id) return [];
+      if (!selectedCompanyId) return [];
 
       // Get all project IDs for this company
       const { data: projectIdsData, error: projectIdsError } = await supabase
         .from("projects")
         .select("id")
-        .eq("company_id", profile.company_id);
+        .eq("company_id", selectedCompanyId);
 
       if (projectIdsError) throw projectIdsError;
       
@@ -91,7 +85,7 @@ const Projects = () => {
       if (error) throw error;
       return data as ProjectActivity[];
     },
-    enabled: !!profile?.company_id,
+    enabled: !!selectedCompanyId,
   });
 
   // Filter projects based on search query
@@ -104,7 +98,7 @@ const Projects = () => {
   const calculateProjectProgress = (projectId: string) => {
     const projectActivities = allActivities.filter(a => a.project_id === projectId);
     const totalActivities = projectActivities.length;
-    const completedActivities = projectActivities.filter(a => a.status === "Feito").length;
+    const completedActivities = projectActivities.filter(a => a.status === "concluida").length;
     
     const completionPercentage = totalActivities > 0 
       ? Math.round((completedActivities / totalActivities) * 100) 
@@ -129,20 +123,20 @@ const Projects = () => {
     const categorized: Record<string, ProjectActivity[]> = {
       'Concluídas': [],
       'Em andamento': [],
-      'Não iniciadas': [],
+      'Pendentes': [],
       'Atrasadas': []
     };
 
     allActivities.forEach(activity => {
-      if (activity.status === "Feito") {
+      if (activity.status === "concluida") {
         categorized['Concluídas'].push(activity);
-      } else if (activity.status === "Em andamento") {
+      } else if (activity.status === "em_andamento") {
         categorized['Em andamento'].push(activity);
-      } else if (activity.status === "Não iniciado") {
-        categorized['Não iniciadas'].push(activity);
+      } else if (activity.status === "pendente") {
+        categorized['Pendentes'].push(activity);
       }
       
-      if (activity.schedule_status === "Atrasado") {
+      if (activity.deadline_status === "fora_do_prazo") {
         categorized['Atrasadas'].push(activity);
       }
     });
@@ -155,8 +149,8 @@ const Projects = () => {
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!profile?.company_id) {
-      toast.error("Erro: Empresa não encontrada");
+    if (!selectedCompanyId || !profile?.id) {
+      toast.error("Erro: Empresa não encontrada ou usuário não autenticado");
       return;
     }
 
@@ -166,7 +160,8 @@ const Projects = () => {
         .insert({
           name: projectName,
           description: projectDescription,
-          company_id: profile.company_id,
+          company_id: selectedCompanyId,
+          created_by: profile.id,
         });
 
       if (error) throw error;
@@ -217,7 +212,6 @@ const Projects = () => {
               <Kanban className="h-4 w-4" />
               Kanban
             </Button>
-
           </div>
 
           <div className="relative flex-1">
@@ -320,7 +314,6 @@ const Projects = () => {
                   key={project.id} 
                   className="hover:shadow-lg transition-all hover-scale cursor-pointer"
                   onClick={() => {
-                    // Navigate to project detail page
                     window.location.href = `/projects/${project.id}`;
                   }}
                 >
@@ -388,7 +381,7 @@ const Projects = () => {
                           <CardContent className="p-3">
                             <div className="space-y-2">
                               <div>
-                                <h3 className="font-medium text-sm truncate">{activity.title}</h3>
+                                <h3 className="font-medium text-sm truncate">{activity.name}</h3>
                                 <p className="text-xs text-muted-foreground truncate">
                                   {project?.name || 'Projeto desconhecido'}
                                 </p>

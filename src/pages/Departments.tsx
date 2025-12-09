@@ -25,7 +25,7 @@ const Departments = () => {
   const [editing, setEditing] = useState<Department | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const { profile, isAdmin } = useAuth();
+  const { profile, isAdmin, selectedCompanyId } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -35,25 +35,15 @@ const Departments = () => {
       return;
     }
     fetchDepartments();
-  }, [isAdmin, navigate, profile?.company_id]);
+  }, [isAdmin, navigate, selectedCompanyId]);
 
   const fetchDepartments = async () => {
-    if (!profile?.company_id && profile?.id !== 'local-user') return;
-
-    // Mock data for local user
-    if (profile?.id === 'local-user') {
-      setDepartments([
-        { id: 'dept-1', name: 'Comercial', description: 'Vendas e Negociações', created_at: new Date().toISOString() },
-        { id: 'dept-2', name: 'Financeiro', description: 'Contas a pagar e receber', created_at: new Date().toISOString() },
-        { id: 'dept-3', name: 'TI', description: 'Tecnologia da Informação', created_at: new Date().toISOString() },
-      ]);
-      return;
-    }
+    if (!selectedCompanyId) return;
 
     const { data, error } = await supabase
       .from("departments")
       .select("*")
-      .eq('company_id', profile?.company_id)
+      .eq('company_id', selectedCompanyId)
       .order("name");
 
     if (error) {
@@ -67,10 +57,8 @@ const Departments = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (profile?.id === 'local-user') {
-      toast.success(editing ? "Departamento atualizado (Simulação)" : "Departamento criado (Simulação)");
-      setOpen(false);
-      resetForm();
+    if (!profile?.id || !selectedCompanyId) {
+      toast.error("Usuário não autenticado");
       return;
     }
 
@@ -92,7 +80,8 @@ const Departments = () => {
         .insert({
           name,
           description,
-          company_id: profile?.company_id
+          company_id: selectedCompanyId,
+          created_by: profile.id,
         });
 
       if (error) {
@@ -117,11 +106,6 @@ const Departments = () => {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir este departamento?")) return;
-
-    if (profile?.id === 'local-user') {
-      toast.success("Departamento excluído (Simulação)");
-      return;
-    }
 
     const { error } = await supabase.from("departments").delete().eq("id", id);
 

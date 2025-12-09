@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Search, Calendar, ClipboardList, CheckCircle2, TrendingUp, Clock, XCircle, AlertTriangle, CheckCircle, DollarSign, Users, Bell } from "lucide-react";
+import { Search, Calendar, ClipboardList, CheckCircle2, TrendingUp, Clock, XCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ActionButtons } from "@/components/ActionButtons";
 import { DepartmentTasksPanel } from "@/components/DepartmentTasksPanel";
@@ -7,92 +7,18 @@ import { DashboardCard } from "@/components/DashboardCard";
 import { TaskChart } from "@/components/TaskChart";
 import { useTasks } from "@/hooks/useTasks";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 
-import { ActivitiesTable } from "@/components/ActivitiesTable";
 import { CreateTaskDialog } from "@/components/CreateTaskDialog";
-import { Task, TaskStatus } from "@/types/task";
-
-const FilteredTasksModal = ({
-  status,
-  isOpen,
-  onClose
-}: {
-  status: string | null,
-  isOpen: boolean,
-  onClose: () => void
-}) => {
-  const { isAdmin } = useAuth();
-
-  const filters = useMemo(() => ({
-    status: status ? [status as TaskStatus] : undefined
-  }), [status]);
-
-  const { tasks, updateTask, deleteTask, completeTask, isLoading } = useTasks(filters);
-
-  // Fetch profiles for the responsible select
-  const { data: profiles = [] } = useQuery({
-    queryKey: ['profiles'],
-    queryFn: async () => {
-      const { data } = await supabase.from('profiles').select('id, full_name');
-      return data || [];
-    }
-  });
-
-  const handleEdit = (task: Task) => {
-    window.location.href = "/activities";
-  };
-
-  return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Tarefas - {status}</DialogTitle>
-        </DialogHeader>
-        <div className="mt-4">
-          <ActivitiesTable
-            tasks={tasks}
-            isLoading={isLoading}
-            isAdmin={isAdmin}
-            profiles={profiles}
-            onUpdateTask={updateTask}
-            onDeleteTask={deleteTask}
-            onCompleteTask={completeTask}
-            onEditTask={handleEdit}
-          />
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-};
 
 const Index = () => {
-  const { selectedCompanyId } = useAuth();
-  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const { selectedCompanyId, profile } = useAuth();
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
   const [date, setDate] = useState<Date | undefined>(undefined);
 
-  // Filtros para useTasks
-  const filters = useMemo(() => {
-    const f: Record<string, string> = {};
-    if (date) {
-      const dateStr = date.toISOString().split('T')[0];
-      f.date_from = dateStr;
-      f.date_to = dateStr;
-    }
-    return f;
-  }, [date]);
-
-  const { metrics, createTask } = useTasks(filters);
+  const { metrics, createTask } = useTasks();
 
   // Fetch profiles
   const { data: profiles = [] } = useQuery({
@@ -118,12 +44,27 @@ const Index = () => {
     enabled: !!selectedCompanyId
   });
 
+  // Fetch projects for task creation
+  const { data: projects = [] } = useQuery({
+    queryKey: ['projects', selectedCompanyId],
+    queryFn: async () => {
+      if (!selectedCompanyId) return [];
+      const { data } = await supabase
+        .from('projects')
+        .select('id, name')
+        .eq('company_id', selectedCompanyId)
+        .order('name');
+      return data || [];
+    },
+    enabled: !!selectedCompanyId
+  });
+
   // Dados para gráfico de pizza - Distribuição por status
   const statusChartData = metrics ? [
-    { name: 'Feito', value: metrics.completed },
+    { name: 'Concluídas', value: metrics.completed },
     { name: 'Em andamento', value: metrics.in_progress },
-    { name: 'Não iniciado', value: metrics.not_started },
-    { name: 'Parado', value: metrics.stopped },
+    { name: 'Pendentes', value: metrics.pending },
+    { name: 'Atrasadas', value: metrics.overdue },
   ].filter(item => item.value > 0) : [];
 
   // Dados para gráfico de barras - Comparativo
@@ -133,29 +74,13 @@ const Index = () => {
     { name: 'Atrasadas', value: metrics.overdue },
   ] : [];
 
-  const handleChartClick = (data: { name: string } | null) => {
-    if (data && data.name) {
-      const statusMap: Record<string, string> = {
-        'Feito': 'Feito',
-        'Em andamento': 'Em andamento',
-        'Não iniciado': 'Não iniciado',
-        'Parado': 'Parado'
-      };
-
-      if (statusMap[data.name]) {
-        setSelectedStatus(statusMap[data.name]);
-        setIsModalOpen(true);
-      }
-    }
-  };
-
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">Painel de Controle</h1>
           <p className="text-muted-foreground">
-            Bem-vindo de volta, {'usuário'}
+            Bem-vindo de volta, {profile?.full_name || 'usuário'}
           </p>
         </div>
       </div>
@@ -179,17 +104,17 @@ const Index = () => {
 
       <div className="grid gap-4 md:grid-cols-2">
         <DashboardCard
-          title="Vencem Hoje"
-          value={metrics?.due_today || 0}
-          description="Tarefas com prazo para hoje"
+          title="Total de Atividades"
+          value={metrics?.total || 0}
+          description="Atividades cadastradas"
           icon={Calendar}
           iconColor="text-blue-600"
         />
 
         <DashboardCard
           title="Pendentes"
-          value={metrics ? metrics.in_progress + metrics.not_started : 0}
-          description="Tarefas em andamento ou não iniciadas"
+          value={metrics ? metrics.in_progress + metrics.pending : 0}
+          description="Atividades em andamento ou pendentes"
           icon={ClipboardList}
           iconColor="text-purple-600"
         />
@@ -218,7 +143,7 @@ const Index = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-700">{metrics?.in_progress || 0}</div>
-            <p className="text-xs text-blue-600 mt-1">Tarefas sendo executadas</p>
+            <p className="text-xs text-blue-600 mt-1">Atividades sendo executadas</p>
           </CardContent>
         </Card>
 
@@ -233,14 +158,14 @@ const Index = () => {
           </CardContent>
         </Card>
 
-        <Card className="border-red-200 bg-red-50/50">
+        <Card className="border-gray-200 bg-gray-50/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Paradas</CardTitle>
-            <XCircle className="h-5 w-5 text-red-600" />
+            <CardTitle className="text-sm font-medium">Pendentes</CardTitle>
+            <XCircle className="h-5 w-5 text-gray-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-700">{metrics?.stopped || 0}</div>
-            <p className="text-xs text-red-600 mt-1">Tarefas bloqueadas</p>
+            <div className="text-2xl font-bold text-gray-700">{metrics?.pending || 0}</div>
+            <p className="text-xs text-gray-600 mt-1">Aguardando início</p>
           </CardContent>
         </Card>
       </div>
@@ -248,16 +173,15 @@ const Index = () => {
       <div className="grid gap-4 md:grid-cols-2">
         <TaskChart
           type="pie"
-          title="Distribuição de Tarefas"
-          description="Tarefas por status"
+          title="Distribuição de Atividades"
+          description="Atividades por status"
           data={statusChartData}
-          onClick={handleChartClick}
         />
 
         <TaskChart
           type="bar"
           title="Comparativo Geral"
-          description="Visão geral das tarefas"
+          description="Visão geral das atividades"
           data={comparisonChartData}
         />
       </div>
@@ -277,7 +201,7 @@ const Index = () => {
         <CardContent>
           <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">Total de Tarefas</p>
+              <p className="text-sm font-medium text-muted-foreground">Total de Atividades</p>
               <p className="text-3xl font-bold">{metrics?.total || 0}</p>
             </div>
             <div className="space-y-2">
@@ -287,7 +211,7 @@ const Index = () => {
               </p>
             </div>
             <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">Tarefas Atrasadas</p>
+              <p className="text-sm font-medium text-muted-foreground">Atividades Atrasadas</p>
               <p className="text-3xl font-bold text-red-600">
                 {metrics?.overdue || 0}
               </p>
@@ -297,21 +221,24 @@ const Index = () => {
       </Card>
 
       <div className="text-center text-sm text-muted-foreground">
-        Omie © 2025
+        Sistema de Gestão © 2025
       </div>
-
-      <FilteredTasksModal
-        status={selectedStatus}
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-      />
 
       <CreateTaskDialog
         open={isCreateTaskOpen}
         onOpenChange={setIsCreateTaskOpen}
-        onSubmit={createTask}
+        onSubmit={(data) => {
+          if (data.project_id) {
+            createTask({ 
+              name: data.name || data.title || '', 
+              project_id: data.project_id,
+              description: data.description 
+            });
+          }
+        }}
         departments={departments}
         profiles={profiles}
+        projects={projects}
       />
     </div>
   );

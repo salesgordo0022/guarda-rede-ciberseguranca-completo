@@ -1,35 +1,24 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { 
-  Plus, 
-  Search, 
-  Calendar, 
-  User, 
-  Building2, 
-  CheckCircle2, 
-  Clock, 
-  XCircle,
-  ArrowLeft
-} from "lucide-react";
+import { Plus, Search, ArrowLeft } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
-import { ProjectActivitiesTable } from "@/components/ProjectActivitiesTable";
-import { createActivityCreatedNotification, createActivityAssignedNotification, createActivityCompletedNotification } from "@/utils/notificationUtils";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { Database } from "@/integrations/supabase/types";
+
+type ActivityStatus = Database['public']['Enums']['activity_status'];
 
 interface Project {
   id: string;
@@ -42,29 +31,14 @@ interface Project {
 interface ProjectActivity {
   id: string;
   project_id: string;
-  title: string;
+  name: string;
   description: string | null;
-  responsible: string | null;
-  department_ids: string[] | null;
-  status: string;
-  priority: string;
+  status: ActivityStatus;
   deadline: string | null;
-  schedule_start: string | null;
-  schedule_end: string | null;
-  schedule_status: string | null;
+  deadline_status: string | null;
   completed_at: string | null;
   created_at: string;
   updated_at: string;
-}
-
-interface Department {
-  id: string;
-  name: string;
-}
-
-interface Profile {
-  id: string;
-  full_name: string;
 }
 
 const ProjectDetail = () => {
@@ -76,15 +50,9 @@ const ProjectDetail = () => {
   const [searchQuery, setSearchQuery] = useState("");
   
   // Form state for new activity
-  const [activityTitle, setActivityTitle] = useState("");
+  const [activityName, setActivityName] = useState("");
   const [activityDescription, setActivityDescription] = useState("");
-  const [activityResponsible, setActivityResponsible] = useState("");
-  const [activityStatus, setActivityStatus] = useState("Não iniciado");
-  const [activityPriority, setActivityPriority] = useState("média");
   const [activityDeadline, setActivityDeadline] = useState("");
-  const [activityScheduleStart, setActivityScheduleStart] = useState("");
-  const [activityScheduleEnd, setActivityScheduleEnd] = useState("");
-  const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
 
   // Fetch project
   const { data: project, isLoading: isProjectLoading, error: projectError } = useQuery({
@@ -104,39 +72,8 @@ const ProjectDetail = () => {
     enabled: !!projectId,
   });
 
-  // Fetch departments
-  const { data: departments = [] } = useQuery({
-    queryKey: ["departments", profile?.company_id],
-    queryFn: async () => {
-      if (!profile?.company_id) return [];
-
-      const { data, error } = await supabase
-        .from("departments")
-        .select("id, name")
-        .eq("company_id", profile.company_id)
-        .order("name");
-
-      if (error) throw error;
-      return data as Department[];
-    },
-    enabled: !!profile?.company_id,
-  });
-
-  // Fetch profiles
-  const { data: profiles = [] } = useQuery({
-    queryKey: ["profiles"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, full_name");
-
-      if (error) throw error;
-      return data as Profile[];
-    },
-  });
-
   // Fetch project activities
-  const { data: activities = [], isLoading: isActivitiesLoading, error: activitiesError } = useQuery({
+  const { data: activities = [], isLoading: isActivitiesLoading } = useQuery({
     queryKey: ["project-activities", projectId],
     queryFn: async () => {
       if (!projectId) return [];
@@ -155,45 +92,30 @@ const ProjectDetail = () => {
 
   // Filter activities based on search query
   const filteredActivities = activities.filter(activity =>
-    activity.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    activity.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (activity.description && activity.description.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const handleCreateActivity = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!projectId) {
-      toast.error("Erro: Projeto não encontrado");
+    if (!projectId || !profile?.id) {
+      toast.error("Erro: Projeto não encontrado ou usuário não autenticado");
       return;
     }
 
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("project_activities")
         .insert({
           project_id: projectId,
-          title: activityTitle,
-          description: activityDescription,
-          responsible: activityResponsible || null,
-          department_ids: selectedDepartments.length > 0 ? selectedDepartments : null,
-          status: activityStatus,
-          priority: activityPriority,
+          name: activityName,
+          description: activityDescription || null,
           deadline: activityDeadline || null,
-          schedule_start: activityScheduleStart || null,
-          schedule_end: activityScheduleEnd || null,
-          schedule_status: calculateScheduleStatus(activityDeadline, activityScheduleEnd),
-          has_fine: false,
-          created_by: profile?.id || null,
-        })
-        .select()
-        .single();
+          created_by: profile.id,
+        });
 
       if (error) throw error;
-
-      // Create notification for the new activity
-      if (data && profile?.id) {
-        await createActivityCreatedNotification(data, profile.id);
-      }
 
       toast.success("Atividade criada com sucesso!");
       setIsCreateActivityDialogOpen(false);
@@ -204,54 +126,24 @@ const ProjectDetail = () => {
     }
   };
 
-  const handleUpdateActivity = async (data: Partial<ProjectActivity> & { id: string }) => {
+  const handleUpdateActivityStatus = async (id: string, status: ActivityStatus) => {
     try {
-      // First, get the current activity to compare changes
-      const { data: currentActivity } = await supabase
-        .from("project_activities")
-        .select("*")
-        .eq("id", data.id)
-        .single();
+      const updates: any = { status };
+      if (status === 'concluida') {
+        updates.completed_at = new Date().toISOString();
+      }
 
       const { error } = await supabase
         .from("project_activities")
-        .update(data)
-        .eq("id", data.id);
+        .update(updates)
+        .eq("id", id);
 
       if (error) throw error;
 
-      // Check if status was updated to "Feito"
-      if (data.status === "Feito" && currentActivity?.status !== "Feito" && profile?.id) {
-        // Get the updated activity
-        const { data: updatedActivity } = await supabase
-          .from("project_activities")
-          .select("*")
-          .eq("id", data.id)
-          .single();
-          
-        if (updatedActivity) {
-          await createActivityCompletedNotification(updatedActivity, profile.id);
-        }
-      }
-
-      // Check if responsible was assigned/changed
-      if (data.responsible && data.responsible !== currentActivity?.responsible && profile?.id) {
-        // Get the updated activity
-        const { data: updatedActivity } = await supabase
-          .from("project_activities")
-          .select("*")
-          .eq("id", data.id)
-          .single();
-          
-        if (updatedActivity) {
-          await createActivityAssignedNotification(updatedActivity, profile.id);
-        }
-      }
-
-      toast.success("Atividade atualizada com sucesso!");
+      toast.success("Status atualizado!");
       queryClient.invalidateQueries({ queryKey: ["project-activities", projectId] });
     } catch (error) {
-      toast.error("Erro ao atualizar atividade: " + (error as Error).message);
+      toast.error("Erro ao atualizar status: " + (error as Error).message);
     }
   };
 
@@ -273,51 +165,28 @@ const ProjectDetail = () => {
     }
   };
 
-  const handleEditActivity = (activity: ProjectActivity) => {
-    // For now, we'll just show a toast. In a real implementation, you might open an edit dialog.
-    toast.info("Funcionalidade de edição em desenvolvimento");
-  };
-
-  const calculateScheduleStatus = (deadline: string | null, scheduleEnd: string | null) => {
-    if (!deadline || !scheduleEnd) return null;
-    const deadlineDate = new Date(deadline);
-    const scheduleEndDate = new Date(scheduleEnd);
-    const today = new Date();
-    if (today > deadlineDate || today > scheduleEndDate) {
-      return "Atrasado";
-    }
-    return "Dentro do prazo";
-  };
-
   const resetActivityForm = () => {
-    setActivityTitle("");
+    setActivityName("");
     setActivityDescription("");
-    setActivityResponsible("");
-    setActivityStatus("Não iniciado");
-    setActivityPriority("média");
     setActivityDeadline("");
-    setActivityScheduleStart("");
-    setActivityScheduleEnd("");
-    setSelectedDepartments([]);
   };
 
-  const getActivityPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "urgente": return "bg-red-500";
-      case "alta": return "bg-orange-500";
-      case "média": return "bg-yellow-500";
-      case "baixa": return "bg-green-500";
-      default: return "bg-gray-500";
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "concluida": return "bg-green-100 text-green-800";
+      case "em_andamento": return "bg-blue-100 text-blue-800";
+      case "cancelada": return "bg-red-100 text-red-800";
+      default: return "bg-gray-100 text-gray-800";
     }
   };
 
-  const getActivityStatusColor = (status: string) => {
+  const getStatusLabel = (status: string) => {
     switch (status) {
-      case "Feito": return "bg-green-500";
-      case "Em andamento": return "bg-blue-500";
-      case "Parado": return "bg-red-500";
-      case "Não iniciado": return "bg-gray-500";
-      default: return "bg-gray-500";
+      case "concluida": return "Concluída";
+      case "em_andamento": return "Em andamento";
+      case "cancelada": return "Cancelada";
+      case "pendente": return "Pendente";
+      default: return status;
     }
   };
 
@@ -359,10 +228,10 @@ const ProjectDetail = () => {
 
   // Calculate project metrics
   const totalActivities = activities.length;
-  const completedActivities = activities.filter(a => a.status === "Feito").length;
-  const inProgressActivities = activities.filter(a => a.status === "Em andamento").length;
-  const notStartedActivities = activities.filter(a => a.status === "Não iniciado").length;
-  const overdueActivities = activities.filter(a => a.schedule_status === "Atrasado").length;
+  const completedActivities = activities.filter(a => a.status === "concluida").length;
+  const inProgressActivities = activities.filter(a => a.status === "em_andamento").length;
+  const pendingActivities = activities.filter(a => a.status === "pendente").length;
+  const overdueActivities = activities.filter(a => a.deadline_status === "fora_do_prazo").length;
   
   const completionPercentage = totalActivities > 0 
     ? Math.round((completedActivities / totalActivities) * 100) 
@@ -425,10 +294,10 @@ const ProjectDetail = () => {
         
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Não Iniciadas</CardTitle>
+            <CardTitle className="text-sm font-medium">Pendentes</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-600">{notStartedActivities}</div>
+            <div className="text-2xl font-bold text-gray-600">{pendingActivities}</div>
           </CardContent>
         </Card>
         
@@ -471,7 +340,7 @@ const ProjectDetail = () => {
         <div>
           <h2 className="text-2xl font-bold">Atividades do Projeto</h2>
           <p className="text-muted-foreground">
-            Gerencie as atividades transversais deste projeto
+            Gerencie as atividades deste projeto
           </p>
         </div>
 
@@ -495,160 +364,41 @@ const ProjectDetail = () => {
                   Nova Atividade
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-2xl">
+              <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Criar Nova Atividade</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleCreateActivity} className="space-y-4 pt-4">
                   <div className="space-y-2">
-                    <Label htmlFor="activityTitle">Título da Atividade *</Label>
+                    <Label htmlFor="activityName">Nome da Atividade *</Label>
                     <Input
-                      id="activityTitle"
-                      value={activityTitle}
-                      onChange={(e) => setActivityTitle(e.target.value)}
-                      placeholder="Ex: Definir escopo do projeto"
+                      id="activityName"
+                      value={activityName}
+                      onChange={(e) => setActivityName(e.target.value)}
+                      placeholder="Ex: Revisar documentação"
                       required
                     />
                   </div>
                   
                   <div className="space-y-2">
                     <Label htmlFor="activityDescription">Descrição</Label>
-                    <textarea
+                    <Textarea
                       id="activityDescription"
                       value={activityDescription}
                       onChange={(e) => setActivityDescription(e.target.value)}
-                      placeholder="Descreva os detalhes da atividade..."
-                      className="w-full min-h-[100px] p-3 border rounded-md bg-background text-foreground"
+                      placeholder="Descreva a atividade..."
+                      rows={3}
                     />
                   </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="activityResponsible">Responsável</Label>
-                      <Select value={activityResponsible} onValueChange={setActivityResponsible}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione um responsável" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {profiles.map((profile) => (
-                            <SelectItem key={profile.id} value={profile.id}>
-                              {profile.full_name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="activityPriority">Prioridade</Label>
-                      <Select value={activityPriority} onValueChange={setActivityPriority}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione a prioridade" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="baixa">
-                            <div className="flex items-center gap-2">
-                              <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                              Baixa
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="média">
-                            <div className="flex items-center gap-2">
-                              <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                              Média
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="alta">
-                            <div className="flex items-center gap-2">
-                              <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-                              Alta
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="urgente">
-                            <div className="flex items-center gap-2">
-                              <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                              Urgente
-                            </div>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="activityStatus">Status</Label>
-                      <Select value={activityStatus} onValueChange={setActivityStatus}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Não iniciado">Não iniciado</SelectItem>
-                          <SelectItem value="Em andamento">Em andamento</SelectItem>
-                          <SelectItem value="Parado">Parado</SelectItem>
-                          <SelectItem value="Feito">Feito</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label>Departamentos Envolvidos</Label>
-                      <div className="flex flex-wrap gap-2">
-                        {departments.map((dept) => (
-                          <Badge
-                            key={dept.id}
-                            className={`cursor-pointer ${
-                              selectedDepartments.includes(dept.id)
-                                ? "bg-primary"
-                                : "bg-muted hover:bg-muted/80"
-                            }`}
-                            onClick={() => {
-                              if (selectedDepartments.includes(dept.id)) {
-                                setSelectedDepartments(
-                                  selectedDepartments.filter((id) => id !== dept.id)
-                                );
-                              } else {
-                                setSelectedDepartments([...selectedDepartments, dept.id]);
-                              }
-                            }}
-                          >
-                            {dept.name}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="activityDeadline">Prazo</Label>
-                      <Input
-                        id="activityDeadline"
-                        type="date"
-                        value={activityDeadline}
-                        onChange={(e) => setActivityDeadline(e.target.value)}
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="activityScheduleStart">Início do Cronograma</Label>
-                      <Input
-                        id="activityScheduleStart"
-                        type="date"
-                        value={activityScheduleStart}
-                        onChange={(e) => setActivityScheduleStart(e.target.value)}
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="activityScheduleEnd">Fim do Cronograma</Label>
-                      <Input
-                        id="activityScheduleEnd"
-                        type="date"
-                        value={activityScheduleEnd}
-                        onChange={(e) => setActivityScheduleEnd(e.target.value)}
-                      />
-                    </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="activityDeadline">Prazo</Label>
+                    <Input
+                      id="activityDeadline"
+                      type="date"
+                      value={activityDeadline}
+                      onChange={(e) => setActivityDeadline(e.target.value)}
+                    />
                   </div>
                   
                   <Button type="submit" className="w-full">
@@ -661,32 +411,85 @@ const ProjectDetail = () => {
         </div>
       </div>
 
-      {/* Activities List */}
-      {isActivitiesLoading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3].map((i) => (
-            <Card key={i} className="animate-pulse">
-              <CardHeader>
-                <div className="h-6 bg-muted rounded w-3/4"></div>
-              </CardHeader>
-              <CardContent>
-                <div className="h-4 bg-muted rounded w-full mb-2"></div>
-                <div className="h-4 bg-muted rounded w-2/3"></div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <ProjectActivitiesTable
-          activities={filteredActivities}
-          isLoading={isActivitiesLoading}
-          departments={departments}
-          profiles={profiles}
-          onUpdateActivity={handleUpdateActivity}
-          onDeleteActivity={handleDeleteActivity}
-          onEditActivity={handleEditActivity}
-        />
-      )}
+      {/* Activities Table */}
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Atividade</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Prazo</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isActivitiesLoading ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center py-8">
+                    Carregando atividades...
+                  </TableCell>
+                </TableRow>
+              ) : filteredActivities.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                    Nenhuma atividade encontrada
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredActivities.map((activity) => (
+                  <TableRow key={activity.id}>
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        <span className="font-medium">{activity.name}</span>
+                        {activity.description && (
+                          <span className="text-xs text-muted-foreground line-clamp-1">
+                            {activity.description}
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Select
+                        defaultValue={activity.status}
+                        onValueChange={(value) => handleUpdateActivityStatus(activity.id, value as ActivityStatus)}
+                      >
+                        <SelectTrigger className={`w-[140px] h-8 ${getStatusColor(activity.status)} border-0`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pendente">Pendente</SelectItem>
+                          <SelectItem value="em_andamento">Em andamento</SelectItem>
+                          <SelectItem value="concluida">Concluída</SelectItem>
+                          <SelectItem value="cancelada">Cancelada</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      {activity.deadline 
+                        ? format(new Date(activity.deadline), "dd/MM/yyyy", { locale: ptBR })
+                        : "—"
+                      }
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {(isAdmin || isGestor) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => handleDeleteActivity(activity.id)}
+                        >
+                          Excluir
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 };

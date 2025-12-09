@@ -2,6 +2,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { Database } from '@/integrations/supabase/types';
+
+type ActivityStatus = Database['public']['Enums']['activity_status'];
 
 // Tipos baseados na tabela project_activities
 export interface ProjectActivity {
@@ -9,9 +12,9 @@ export interface ProjectActivity {
     project_id: string;
     name: string;
     description: string | null;
-    status: 'pendente' | 'em_andamento' | 'concluida' | 'cancelada';
+    status: ActivityStatus;
     deadline: string | null;
-    deadline_status: 'no_prazo' | 'fora_do_prazo' | 'concluido_no_prazo' | 'concluido_atrasado' | 'bateu_meta' | null;
+    deadline_status: Database['public']['Enums']['deadline_status'] | null;
     scheduled_date: string | null;
     completed_at: string | null;
     kanban_column: string | null;
@@ -137,7 +140,7 @@ export function useTasks(projectId?: string) {
 
     // Atualizar atividade
     const updateTask = useMutation({
-        mutationFn: async ({ id, ...updates }: { id: string; status?: string; name?: string }) => {
+        mutationFn: async ({ id, ...updates }: { id: string; status?: ActivityStatus; name?: string; description?: string }) => {
             const { data, error } = await supabase
                 .from('project_activities')
                 .update(updates)
@@ -198,7 +201,7 @@ export function useTasks(projectId?: string) {
             const { data, error } = await supabase
                 .from('project_activities')
                 .update({
-                    status: 'concluida',
+                    status: 'concluida' as ActivityStatus,
                     completed_at: new Date().toISOString(),
                 })
                 .eq('id', id)
