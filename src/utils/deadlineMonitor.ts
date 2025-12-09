@@ -1,12 +1,12 @@
 import { supabase } from "@/integrations/supabase/client";
-import { createDeadlineApproachingNotification } from "@/utils/notificationUtils";
 
 /**
- * Checks for upcoming deadlines and creates notifications
+ * Checks for upcoming deadlines and logs them
+ * Note: Notifications table doesn't exist, so we just log for now
  */
 export async function checkUpcomingDeadlines() {
   try {
-    // Get activities with deadlines in the next 24 hours that haven't been notified yet
+    // Get activities with deadlines in the next 24 hours
     const oneDayFromNow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
     
     const { data: activities, error } = await supabase
@@ -14,31 +14,20 @@ export async function checkUpcomingDeadlines() {
       .select('*')
       .lte('deadline', oneDayFromNow)
       .gte('deadline', new Date().toISOString())
-      .neq('status', 'Feito'); // Don't notify for completed tasks
+      .neq('status', 'concluida');
 
     if (error) {
       console.error("Error fetching activities for deadline check:", error);
       return;
     }
 
-    // Create notifications for each activity
-    for (const activity of activities) {
-      // Check if we've already created a notification for this activity
-      const { data: existingNotifications, error: notificationError } = await supabase
-        .from('notifications')
-        .select('id')
-        .eq('task_id', activity.id)
-        .eq('type', 'deadline_approaching');
-
-      if (notificationError) {
-        console.error("Error checking existing notifications:", notificationError);
-        continue;
-      }
-
-      // Only create notification if one doesn't already exist
-      if (!existingNotifications || existingNotifications.length === 0) {
-        await createDeadlineApproachingNotification(activity, 'system');
-      }
+    if (activities && activities.length > 0) {
+      console.log(`Found ${activities.length} activities with approaching deadlines`);
+      // In a real implementation, you would create notifications here
+      // For now, just log the activities
+      activities.forEach(activity => {
+        console.log(`Deadline approaching for activity: ${activity.name} (deadline: ${activity.deadline})`);
+      });
     }
   } catch (error) {
     console.error("Error in deadline monitoring:", error);
