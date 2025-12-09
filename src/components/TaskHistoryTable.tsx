@@ -1,34 +1,55 @@
-import { useTasks } from "@/hooks/useTasks";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { AlertCircle, Clock } from "lucide-react";
+import { AlertCircle } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 export const TaskHistoryTable = () => {
-    const { tasks, isLoading } = useTasks({
-        status: ['Feito', 'Parado']
+    const { selectedCompanyId } = useAuth();
+
+    const { data: tasks = [], isLoading } = useQuery({
+        queryKey: ['completed-activities', selectedCompanyId],
+        queryFn: async () => {
+            if (!selectedCompanyId) return [];
+
+            const { data, error } = await supabase
+                .from('project_activities')
+                .select(`
+                    *,
+                    project:projects(id, name, company_id)
+                `)
+                .eq('status', 'concluida')
+                .order('completed_at', { ascending: false })
+                .limit(50);
+
+            if (error) throw error;
+            
+            return (data || []).filter((activity: any) => 
+                activity.project?.company_id === selectedCompanyId
+            );
+        },
+        enabled: !!selectedCompanyId
     });
 
     const getStatusColor = (status: string) => {
         switch (status) {
-            case "Feito": return "bg-green-100 text-green-800 border-green-200";
-            case "Parado": return "bg-red-100 text-red-800 border-red-200";
+            case "concluida": return "bg-green-100 text-green-800 border-green-200";
+            case "cancelada": return "bg-red-100 text-red-800 border-red-200";
             default: return "bg-gray-100 text-gray-800 border-gray-200";
         }
     };
 
-    const formatSchedule = (start: string | null, end: string | null) => {
-        if (!start || !end) return "—";
-        try {
-            const startDate = new Date(start);
-            const endDate = new Date(end);
-            const startFormatted = format(startDate, "dd/MM", { locale: ptBR });
-            const endFormatted = format(endDate, "dd/MM", { locale: ptBR });
-            return `${startFormatted} – ${endFormatted}`;
-        } catch {
-            return "—";
+    const getStatusLabel = (status: string) => {
+        switch (status) {
+            case "concluida": return "Concluída";
+            case "cancelada": return "Cancelada";
+            case "em_andamento": return "Em andamento";
+            case "pendente": return "Pendente";
+            default: return status;
         }
     };
 
@@ -43,7 +64,7 @@ export const TaskHistoryTable = () => {
                     <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground" />
                     <h3 className="text-lg font-semibold">Nenhum histórico encontrado</h3>
                     <p className="text-muted-foreground">
-                        Tarefas concluídas ou paradas aparecerão aqui.
+                        Atividades concluídas aparecerão aqui.
                     </p>
                 </div>
             </Card>
@@ -57,18 +78,17 @@ export const TaskHistoryTable = () => {
                     <TableHeader>
                         <TableRow className="bg-muted/50">
                             <TableHead className="w-[300px]">Atividade</TableHead>
-                            <TableHead>Departamento</TableHead>
-                            <TableHead>Responsável</TableHead>
+                            <TableHead>Projeto</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>Concluído em</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {tasks.map((task) => (
+                        {tasks.map((task: any) => (
                             <TableRow key={task.id}>
                                 <TableCell>
                                     <div className="flex flex-col gap-1">
-                                        <span className="font-semibold text-foreground">{task.title}</span>
+                                        <span className="font-semibold text-foreground">{task.name}</span>
                                         {task.description && (
                                             <span className="text-xs text-muted-foreground line-clamp-1">
                                                 {task.description}
@@ -78,24 +98,12 @@ export const TaskHistoryTable = () => {
                                 </TableCell>
                                 <TableCell>
                                     <Badge variant="outline" className="font-normal">
-                                        {task.department?.name || "Geral"}
+                                        {task.project?.name || "—"}
                                     </Badge>
                                 </TableCell>
                                 <TableCell>
-                                    {task.responsible ? (
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
-                                                {task.responsible.charAt(0).toUpperCase()}
-                                            </div>
-                                            <span className="text-sm">{task.responsible}</span>
-                                        </div>
-                                    ) : (
-                                        <span className="text-muted-foreground text-sm">—</span>
-                                    )}
-                                </TableCell>
-                                <TableCell>
                                     <Badge variant="outline" className={`${getStatusColor(task.status)} border-0`}>
-                                        {task.status}
+                                        {getStatusLabel(task.status)}
                                     </Badge>
                                 </TableCell>
                                 <TableCell>
