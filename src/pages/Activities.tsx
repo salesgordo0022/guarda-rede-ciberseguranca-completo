@@ -35,7 +35,7 @@ interface DepartmentActivity {
   schedule_start: string | null;
   schedule_end: string | null;
   deadline_status: Database['public']['Enums']['deadline_status'] | null;
-  priority: Database['public']['Enums']['priority'] | null;
+  priority: 'urgente' | 'media_urgencia' | 'nao_urgente' | null;
   updated_at: string;
   department_id: string;
   assignees?: {
@@ -191,7 +191,7 @@ const Activities = () => {
 
   // Update activity mutation
   const updateMutation = useMutation({
-    mutationFn: async (data: { id: string; name?: string; description?: string; status?: ActivityStatus; deadline?: string; priority?: Database['public']['Enums']['priority'] }) => {
+    mutationFn: async (data: { id: string; name?: string; description?: string; status?: ActivityStatus; deadline?: string; priority?: 'urgente' | 'media_urgencia' | 'nao_urgente' }) => {
       const { id, ...updates } = data;
       const { error } = await supabase
         .from('department_activities')

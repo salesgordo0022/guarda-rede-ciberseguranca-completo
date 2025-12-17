@@ -39,7 +39,7 @@ interface ProjectActivity {
   schedule_start: string | null;
   schedule_end: string | null;
   deadline_status: Database['public']['Enums']['deadline_status'] | null;
-  priority: Database['public']['Enums']['priority'] | null;
+  priority: 'urgente' | 'media_urgencia' | 'nao_urgente' | null;
   completed_at: string | null;
   created_at: string;
   updated_at: string;
