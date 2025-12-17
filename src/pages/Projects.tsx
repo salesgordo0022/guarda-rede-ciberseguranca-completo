@@ -88,8 +88,20 @@ const Projects = () => {
     enabled: !!selectedCompanyId,
   });
 
+  // Filter projects: exclude completed projects (status = 'concluido' or all activities done)
+  const activeProjects = projects.filter(project => {
+    // Exclude projects with status 'concluido'
+    if ((project as any).status === 'concluido') return false;
+    
+    const projectActivities = allActivities.filter(a => a.project_id === project.id);
+    // Keep project if it has no activities or has at least one non-completed activity
+    if (projectActivities.length === 0) return true;
+    const allCompleted = projectActivities.every(a => a.status === "concluida");
+    return !allCompleted;
+  });
+
   // Filter projects based on search query
-  const filteredProjects = projects.filter(project =>
+  const filteredProjects = activeProjects.filter(project =>
     project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (project.description && project.description.toLowerCase().includes(searchQuery.toLowerCase()))
   );
@@ -118,26 +130,36 @@ const Projects = () => {
     return "bg-red-500";
   };
 
-  // Categorize activities for Kanban view
+  // Categorize activities for Kanban view by activity status
   const categorizeActivities = () => {
     const categorized: Record<string, ProjectActivity[]> = {
-      'Concluídas': [],
-      'Em andamento': [],
-      'Pendentes': [],
-      'Atrasadas': []
+      'Não Iniciado': [],
+      'Pendente': [],
+      'Em Andamento': [],
+      'Concluída': [],
+      'Cancelada': []
     };
 
+    // Categorize all activities by status
     allActivities.forEach(activity => {
-      if (activity.status === "concluida") {
-        categorized['Concluídas'].push(activity);
-      } else if (activity.status === "em_andamento") {
-        categorized['Em andamento'].push(activity);
-      } else if (activity.status === "pendente") {
-        categorized['Pendentes'].push(activity);
-      }
-      
-      if (activity.deadline_status === "fora_do_prazo") {
-        categorized['Atrasadas'].push(activity);
+      switch (activity.status) {
+        case 'nao_iniciado':
+          categorized['Não Iniciado'].push(activity);
+          break;
+        case 'pendente':
+          categorized['Pendente'].push(activity);
+          break;
+        case 'em_andamento':
+          categorized['Em Andamento'].push(activity);
+          break;
+        case 'concluida':
+          categorized['Concluída'].push(activity);
+          break;
+        case 'cancelada':
+          categorized['Cancelada'].push(activity);
+          break;
+        default:
+          categorized['Pendente'].push(activity);
       }
     });
 
@@ -355,56 +377,66 @@ const Projects = () => {
       ) : (
         // Kanban view
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {Object.entries(categorizedActivities).map(([category, activities]) => (
-              <Card key={category} className="flex flex-col h-full">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg">{category}</CardTitle>
-                  <CardDescription>{activities.length} atividades</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-1 overflow-y-auto max-h-[600px] space-y-3">
-                  {activities.length === 0 ? (
-                    <div className="text-center text-muted-foreground py-8">
-                      Nenhuma atividade
-                    </div>
-                  ) : (
-                    activities.map((activity) => {
-                      const project = projects.find(p => p.id === activity.project_id);
-                      return (
-                        <Card 
-                          key={activity.id} 
-                          className="cursor-pointer hover:shadow-md transition-shadow"
-                          onClick={() => {
-                            window.location.href = `/projects/${activity.project_id}`;
-                          }}
-                        >
-                          <CardContent className="p-3">
-                            <div className="space-y-2">
-                              <div>
-                                <h3 className="font-medium text-sm truncate">{activity.name}</h3>
-                                <p className="text-xs text-muted-foreground truncate">
-                                  {project?.name || 'Projeto desconhecido'}
-                                </p>
-                              </div>
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs px-2 py-1 bg-muted rounded">
-                                  {activity.status}
-                                </span>
-                                {activity.deadline && (
-                                  <span className="text-xs text-muted-foreground">
-                                    {new Date(activity.deadline).toLocaleDateString('pt-BR')}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            {Object.entries(categorizedActivities).map(([category, activities]) => {
+              // Define colors based on category
+              let bgColor = "bg-gray-50 border-gray-100";
+              if (category === "Não Iniciado") bgColor = "bg-gray-50 border-gray-100";
+              else if (category === "Pendente") bgColor = "bg-gray-100 border-gray-200";
+              else if (category === "Em Andamento") bgColor = "bg-blue-50 border-blue-200";
+              else if (category === "Concluída") bgColor = "bg-green-50 border-green-200";
+              else if (category === "Cancelada") bgColor = "bg-red-50 border-red-200";
+              
+              return (
+                <Card key={category} className={`flex flex-col h-full ${bgColor}`}>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg">{category}</CardTitle>
+                    <CardDescription>{activities.length} atividades</CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex-1 overflow-y-auto max-h-[600px] space-y-3">
+                    {activities.length === 0 ? (
+                      <div className="text-center text-muted-foreground py-8">
+                        Nenhuma atividade
+                      </div>
+                    ) : (
+                      activities.map((activity) => {
+                        const project = projects.find(p => p.id === activity.project_id);
+                        return (
+                          <Card 
+                            key={activity.id} 
+                            className="cursor-pointer hover:shadow-md transition-shadow bg-white"
+                            onClick={() => {
+                              window.location.href = `/projects/${activity.project_id}`;
+                            }}
+                          >
+                            <CardContent className="p-3">
+                              <div className="space-y-2">
+                                <div>
+                                  <h3 className="font-medium text-sm truncate">{activity.name}</h3>
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {project?.name || 'Projeto desconhecido'}
+                                  </p>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs px-2 py-1 bg-muted rounded">
+                                    {activity.status}
                                   </span>
-                                )}
+                                  {activity.deadline && (
+                                    <span className="text-xs text-muted-foreground">
+                                      {new Date(activity.deadline).toLocaleDateString('pt-BR')}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })
-                  )}
-                </CardContent>
-              </Card>
-            ))}
+                            </CardContent>
+                          </Card>
+                        );
+                      })
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </div>
       )}

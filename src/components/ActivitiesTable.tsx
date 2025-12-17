@@ -13,6 +13,7 @@ interface ActivitiesTableProps {
     isLoading: boolean;
     isAdmin: boolean;
     isGestor?: boolean;
+    currentUserId?: string;
     profiles: { id: string; full_name: string | null }[];
     onUpdateTask: (data: Partial<Task> & { id: string }) => void;
     onDeleteTask: (id: string) => void;
@@ -25,6 +26,7 @@ export const ActivitiesTable = ({
     isLoading,
     isAdmin,
     isGestor = false,
+    currentUserId,
     profiles,
     onUpdateTask,
     onDeleteTask,
@@ -33,6 +35,17 @@ export const ActivitiesTable = ({
 }: ActivitiesTableProps) => {
     const canEditDetails = isAdmin || isGestor;
     const canEditDates = isAdmin;
+
+    // Check if current user can complete the task (is assignee or admin)
+    const canCompleteTask = (task: TaskWithRelations) => {
+        if (isAdmin) return true;
+        // Check if current user is the responsible
+        if (task.responsible && currentUserId) {
+            const responsibleProfile = profiles.find(p => p.full_name === task.responsible);
+            if (responsibleProfile && responsibleProfile.id === currentUserId) return true;
+        }
+        return false;
+    };
 
     return (
         <Card className="border-none shadow-md bg-card/50 backdrop-blur-sm">
@@ -182,7 +195,7 @@ export const ActivitiesTable = ({
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            {task.status !== "Feito" && (
+                                            {task.status !== "Feito" && canCompleteTask(task) && (
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"

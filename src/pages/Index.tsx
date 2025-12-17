@@ -1,16 +1,16 @@
-import { useState, useMemo } from "react";
-import { Search, Calendar, ClipboardList, CheckCircle2, TrendingUp, Clock, XCircle } from "lucide-react";
+import { useState } from "react";
+import { Search, Calendar, ClipboardList } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ActionButtons } from "@/components/ActionButtons";
-import { DepartmentTasksPanel } from "@/components/DepartmentTasksPanel";
+import { GlobalTasksPanel } from "@/components/GlobalTasksPanel";
+import { GlobalMetricsCards } from "@/components/GlobalMetricsCards";
 import { DashboardCard } from "@/components/DashboardCard";
 import { TaskChart } from "@/components/TaskChart";
-import { useTasks } from "@/hooks/useTasks";
+import { useGlobalMetrics } from "@/hooks/useGlobalMetrics";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-
 import { CreateTaskDialog } from "@/components/CreateTaskDialog";
 
 const Index = () => {
@@ -18,7 +18,7 @@ const Index = () => {
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
   const [date, setDate] = useState<Date | undefined>(undefined);
 
-  const { metrics, createTask } = useTasks();
+  const { metrics } = useGlobalMetrics();
 
   // Fetch profiles
   const { data: profiles = [] } = useQuery({
@@ -106,7 +106,7 @@ const Index = () => {
         <DashboardCard
           title="Total de Atividades"
           value={metrics?.total || 0}
-          description="Atividades cadastradas"
+          description="Projetos + Departamentos"
           icon={Calendar}
           iconColor="text-blue-600"
         />
@@ -120,61 +120,17 @@ const Index = () => {
         />
       </div>
 
-      <DepartmentTasksPanel date={date} />
+      {/* Painel unificado de atividades */}
+      <GlobalTasksPanel />
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-green-200 bg-green-50/50">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Concluídas</CardTitle>
-            <CheckCircle2 className="h-5 w-5 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-700">{metrics?.completed || 0}</div>
-            <p className="text-xs text-green-600 mt-1">
-              {metrics?.total ? ((metrics.completed / metrics.total) * 100).toFixed(1) : 0}% do total
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-blue-200 bg-blue-50/50">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Em Andamento</CardTitle>
-            <TrendingUp className="h-5 w-5 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-700">{metrics?.in_progress || 0}</div>
-            <p className="text-xs text-blue-600 mt-1">Atividades sendo executadas</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-orange-200 bg-orange-50/50">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Atrasadas</CardTitle>
-            <Clock className="h-5 w-5 text-orange-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-700">{metrics?.overdue || 0}</div>
-            <p className="text-xs text-orange-600 mt-1">Requerem atenção urgente</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-gray-200 bg-gray-50/50">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pendentes</CardTitle>
-            <XCircle className="h-5 w-5 text-gray-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-700">{metrics?.pending || 0}</div>
-            <p className="text-xs text-gray-600 mt-1">Aguardando início</p>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Cards de métricas clicáveis */}
+      <GlobalMetricsCards />
 
       <div className="grid gap-4 md:grid-cols-2">
         <TaskChart
           type="pie"
           title="Distribuição de Atividades"
-          description="Atividades por status"
+          description="Atividades por status (Projetos + Departamentos)"
           data={statusChartData}
         />
 
@@ -228,13 +184,7 @@ const Index = () => {
         open={isCreateTaskOpen}
         onOpenChange={setIsCreateTaskOpen}
         onSubmit={(data) => {
-          if (data.project_id) {
-            createTask({ 
-              name: data.name || data.title || '', 
-              project_id: data.project_id,
-              description: data.description 
-            });
-          }
+          // Handle task creation
         }}
         departments={departments}
         profiles={profiles}

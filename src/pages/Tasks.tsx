@@ -22,7 +22,8 @@ interface Activity {
   description: string | null;
   status: ActivityStatus;
   deadline: string | null;
-  scheduled_date: string | null;
+  schedule_start: string | null;
+  schedule_end: string | null;
   deadline_status: string | null;
   updated_at: string;
   created_at: string;

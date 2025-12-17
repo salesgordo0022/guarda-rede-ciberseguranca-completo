@@ -6,6 +6,8 @@ import { toast } from 'sonner';
 export interface UserProfile {
   id: string;
   full_name: string;
+  email: string;
+  avatar_url: string | null;
   department_id: string | null;
   company_id: string | null;
   role: 'admin' | 'gestor' | 'colaborador';
@@ -83,6 +85,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userProfile: UserProfile = {
         id: profileData.id,
         full_name: profileData.full_name,
+        email: profileData.email,
+        avatar_url: profileData.avatar_url,
         department_id: departmentData?.department_id || null,
         company_id: companyData?.company_id || null,
         role: (roleData?.role as 'admin' | 'gestor' | 'colaborador') || 'colaborador',

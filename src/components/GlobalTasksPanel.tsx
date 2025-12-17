@@ -21,7 +21,7 @@ import {
 import { getPriorityBadge } from "@/components/ActivityTable";
 import { Database } from "@/integrations/supabase/types";
 
-type Priority = 'urgente' | 'media_urgencia' | 'nao_urgente';
+type Priority = Database['public']['Enums']['priority'];
 
 interface GroupStats {
   name: string;

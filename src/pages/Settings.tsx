@@ -1,4 +1,4 @@
-import { Settings as SettingsIcon, Plus, Pencil, Trash2, Building2, Palette, Check, History, Users } from "lucide-react";
+import { Settings as SettingsIcon, Plus, Pencil, Trash2, Building2, Palette, Check, History, Users, User } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +55,7 @@ import { useSystemSettings, CategoryColors, Theme } from "@/hooks/useSystemSetti
 import { useTasks } from "@/hooks/useTasks";
 import { TaskHistoryTable } from "@/components/TaskHistoryTable";
 import { TeamTabContent } from "@/components/TeamTabContent";
+import { ProfileSettings } from "@/components/ProfileSettings";
 import { useAuth } from "@/hooks/useAuth";
 
 interface Department {
@@ -85,7 +86,7 @@ const Settings = () => {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
     const [deletingDepartment, setDeletingDepartment] = useState<Department | null>(null);
-    const { selectedCompanyId } = useAuth();
+    const { selectedCompanyId, isAdmin } = useAuth();
 
     // Sistema de cores e tema
     const {
@@ -309,27 +310,41 @@ const Settings = () => {
                 </p>
             </div>
 
-            <Tabs defaultValue="departments" className="w-full">
-                <TabsList className="grid w-full max-w-2xl grid-cols-4">
-                    <TabsTrigger value="departments">
-                        <Building2 className="h-4 w-4 mr-2" />
-                        Departamentos
+            <Tabs defaultValue="profile" className="w-full">
+                <TabsList className={`grid w-full max-w-3xl ${isAdmin ? 'grid-cols-5' : 'grid-cols-3'}`}>
+                    <TabsTrigger value="profile">
+                        <User className="h-4 w-4 mr-2" />
+                        Perfil
                     </TabsTrigger>
+                    {isAdmin && (
+                        <TabsTrigger value="departments">
+                            <Building2 className="h-4 w-4 mr-2" />
+                            Departamentos
+                        </TabsTrigger>
+                    )}
                     <TabsTrigger value="appearance">
                         <Palette className="h-4 w-4 mr-2" />
                         Aparência
                     </TabsTrigger>
-                    <TabsTrigger value="team">
-                        <Users className="h-4 w-4 mr-2" />
-                        Equipe
-                    </TabsTrigger>
+                    {isAdmin && (
+                        <TabsTrigger value="team">
+                            <Users className="h-4 w-4 mr-2" />
+                            Equipe
+                        </TabsTrigger>
+                    )}
                     <TabsTrigger value="history">
                         <History className="h-4 w-4 mr-2" />
                         Histórico
                     </TabsTrigger>
                 </TabsList>
 
+                {/* Tab de Perfil */}
+                <TabsContent value="profile" className="space-y-4">
+                    <ProfileSettings />
+                </TabsContent>
+
                 {/* Tab de Departamentos */}
+                {isAdmin && (
                 <TabsContent value="departments" className="space-y-4">
                     <div className="flex items-center justify-between">
                         <div>
@@ -497,6 +512,7 @@ const Settings = () => {
                         </Card>
                     )}
                 </TabsContent>
+                )}
 
                 <TabsContent value="appearance" className="space-y-4">
                     <div>
@@ -711,9 +727,11 @@ const Settings = () => {
                     </Card>
                 </TabsContent>
 
+                {isAdmin && (
                 <TabsContent value="team" className="space-y-4">
                     <TeamTabContent />
                 </TabsContent>
+                )}
 
                 <TabsContent value="history" className="space-y-4">
                     <div>

@@ -15,10 +15,8 @@ import { useAuth, AuthProvider } from "@/hooks/useAuth";
 // Importações de páginas da aplicação
 import Index from "./pages/Index";
 import Tasks from "./pages/Tasks";
-import Team from "./pages/Team";
 import Auth from "./pages/Auth";
 import Departments from "./pages/Departments";
-import Users from "./pages/Users";
 import Activities from "./pages/Activities";
 import NotFound from "./pages/NotFound";
 import Settings from "./pages/Settings";
@@ -144,9 +142,7 @@ const App = () => {
                                 </div>
                                 <Routes>
                                   <Route path="/" element={<Index data-tutorial="dashboard" />} />
-                                  <Route path="/team" element={<Team data-tutorial="team" />} />
                                   <Route path="/departments" element={<Departments data-tutorial="departments" />} />
-                                  <Route path="/users" element={<Users data-tutorial="users" />} />
                                   <Route path="/activities" element={<Activities data-tutorial="activities" />} />
                                   <Route path="/projects" element={<Projects />} />
                                   <Route path="/projects/:projectId" element={<ProjectDetail />} />

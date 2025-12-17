@@ -7,7 +7,8 @@ import {
   Play,
   HelpCircle,
   Building2,
-  Plus
+  Plus,
+  Users
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useNavigate } from "react-router-dom";
@@ -83,25 +84,43 @@ export function AppSidebar() {
     e.preventDefault();
     if (!newCompanyName.trim() || !profile?.id) return;
 
-    const { data, error } = await supabase
-      .from('companies')
-      .insert({ 
-        name: newCompanyName,
-        created_by: profile.id
-      })
-      .select()
-      .single();
+    try {
+      // 1. Create Company
+      const { data: company, error } = await supabase
+        .from('companies')
+        .insert({
+          name: newCompanyName,
+          created_by: profile.id
+        })
+        .select()
+        .single();
 
-    if (error) {
-      toast.error("Erro ao criar empresa");
-      return;
+      if (error) throw error;
+
+      // 2. Link User
+      await supabase.from('user_companies').insert({
+        user_id: profile.id,
+        company_id: company.id,
+        role: 'admin'
+      });
+
+      // 3. Update Profile Logic (Role & Current Company)
+      await supabase.from('user_roles').insert({
+        user_id: profile.id,
+        role: 'admin'
+      });
+      await supabase.from('profiles').update({ role: 'admin', company_id: company.id }).eq('id', profile.id);
+
+      toast.success("Empresa criada com sucesso!");
+      setIsCreatingCompany(false);
+      setNewCompanyName("");
+
+      // Force reload to update context
+      window.location.reload();
+
+    } catch (error: any) {
+      toast.error("Erro ao criar empresa: " + error.message);
     }
-
-    toast.success("Empresa criada com sucesso!");
-    setIsCreatingCompany(false);
-    setNewCompanyName("");
-    refetchCompanies();
-    setSelectedCompanyId(data.id);
   };
 
   const handleLogout = async () => {
@@ -126,7 +145,7 @@ export function AppSidebar() {
           <div className="flex flex-col items-center gap-4 animate-fade-in">
             <div className="flex flex-col items-center gap-2">
               <Avatar className="h-16 w-16 cursor-pointer hover-scale">
-                <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${profile?.full_name || 'User'}`} />
+                <AvatarImage src={profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile?.full_name || 'User'}`} />
                 <AvatarFallback>{profile?.full_name?.substring(0, 2).toUpperCase() || 'US'}</AvatarFallback>
               </Avatar>
               <div className="text-center">
@@ -148,39 +167,50 @@ export function AppSidebar() {
                       {company.name}
                     </SelectItem>
                   ))}
-                  {isAdmin && (
-                    <div className="p-2 border-t mt-1">
-                      <Dialog open={isCreatingCompany} onOpenChange={setIsCreatingCompany}>
-                        <DialogTrigger asChild>
-                          <Button variant="ghost" className="w-full justify-start h-8 px-2 text-xs">
-                            <Plus className="h-3 w-3 mr-2" />
-                            Nova Empresa
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Criar Nova Empresa</DialogTitle>
-                          </DialogHeader>
-                          <form onSubmit={handleCreateCompany} className="space-y-4 pt-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="companyName">Nome da Empresa</Label>
-                              <Input
-                                id="companyName"
-                                value={newCompanyName}
-                                onChange={(e) => setNewCompanyName(e.target.value)}
-                                placeholder="Ex: Minha Empresa Ltda"
-                                required
-                              />
-                            </div>
-                            <Button type="submit" className="w-full">Criar Empresa</Button>
-                          </form>
-                        </DialogContent>
-                      </Dialog>
-                    </div>
-                  )}
+                  <div className="p-2 border-t mt-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start h-8 px-2 text-xs"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setIsCreatingCompany(true);
+                      }}
+                    >
+                      <Plus className="h-3 w-3 mr-2" />
+                      Criar Nova Empresa
+                    </Button>
+                  </div>
                 </SelectContent>
               </Select>
             </div>
+
+            <Dialog open={isCreatingCompany} onOpenChange={setIsCreatingCompany}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Criar Nova Empresa</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="newCompanyName">Nome da Empresa</Label>
+                    <Input
+                      id="newCompanyName"
+                      value={newCompanyName}
+                      onChange={(e) => setNewCompanyName(e.target.value)}
+                      placeholder="Ex: Minha StartUp"
+                    />
+                  </div>
+                  <Button
+                    onClick={handleCreateCompany}
+                    className="w-full"
+                    disabled={!newCompanyName.trim()}
+                  >
+                    Criar e Começar
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         )}
 
@@ -196,7 +226,8 @@ export function AppSidebar() {
             />
           </div>
         )}
-      </SidebarHeader>
+
+      </SidebarHeader >
 
       <SidebarContent className="px-2">
         <SidebarGroup>
@@ -260,6 +291,7 @@ export function AppSidebar() {
           {open && <span className="text-[15px]">Sair</span>}
         </button>
       </SidebarFooter>
-    </Sidebar>
+
+    </Sidebar >
   );
 }

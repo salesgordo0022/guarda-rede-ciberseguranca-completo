@@ -10,7 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 
-type ActivityStatus = 'pendente' | 'em_andamento' | 'concluida' | 'cancelada';
+type ActivityStatus = 'nao_iniciado' | 'pendente' | 'em_andamento' | 'concluida' | 'cancelada';
 
 interface KanbanActivity {
     id: string;
@@ -25,6 +25,7 @@ interface KanbanActivity {
 }
 
 const COLUMNS: { id: ActivityStatus; label: string; color: string }[] = [
+    { id: "nao_iniciado", label: "Não Iniciado", color: "bg-gray-50 border-gray-100" },
     { id: "pendente", label: "Pendente", color: "bg-gray-100 border-gray-200" },
     { id: "em_andamento", label: "Em Andamento", color: "bg-blue-50 border-blue-200" },
     { id: "concluida", label: "Concluída", color: "bg-green-50 border-green-200" },
