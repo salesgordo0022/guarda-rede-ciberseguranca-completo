@@ -9,7 +9,7 @@ import { Database } from "@/integrations/supabase/types";
 
 type ActivityStatus = Database['public']['Enums']['activity_status'];
 type DeadlineStatus = Database['public']['Enums']['deadline_status'];
-type Priority = Database['public']['Enums']['priority'];
+type Priority = 'urgente' | 'media_urgencia' | 'nao_urgente';
 
 interface Assignee {
   user_id: string;
