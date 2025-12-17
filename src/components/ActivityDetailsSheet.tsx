@@ -119,22 +119,8 @@ export function ActivityDetailsSheet({
     }, [open, mode, initialActivity]);
 
     const fetchChecklist = async (activityId: string) => {
-        const { data } = await supabase
-            .from('checklist_items')
-            .select('*')
-            .eq('activity_id', activityId)
-            .order('created_at', { ascending: true });
-
-        if (data) {
-            setChecklistItems(data.map(item => ({
-                id: item.id,
-                text: item.text,
-                completed: item.completed,
-                isNew: false
-            })));
-        } else {
-            setChecklistItems([]);
-        }
+        // Checklist functionality disabled - table doesn't exist yet
+        setChecklistItems([]);
     };
 
     const handleSave = async () => {
@@ -189,29 +175,7 @@ export function ActivityDetailsSheet({
                 toast.success("Atividade atualizada com sucesso!");
             }
 
-            // Save Checklist Items
-            if (activityId) {
-                // 1. Delete removed items (if we tracked them, but for simplicity relying on 'upsert' or manual management if complex. 
-                // For now, simpler approach: Insert new ones, Update changed ones.
-                // Mock mock doesn't support complex upsert well on non-primary keys sometimes so careful loop.)
-
-                const promises = checklistItems.map(async (item) => {
-                    if (item.isNew) {
-                        return supabase.from('checklist_items').insert({
-                            activity_id: activityId,
-                            text: item.text,
-                            completed: item.completed
-                        });
-                    } else {
-                        return supabase.from('checklist_items').update({
-                            text: item.text,
-                            completed: item.completed
-                        }).eq('id', item.id);
-                    }
-                });
-
-                await Promise.all(promises);
-            }
+            // Checklist saving disabled - table doesn't exist yet
 
             // Invalidate queries
             queryClient.invalidateQueries({ queryKey: ['department-activities'] });
@@ -250,11 +214,7 @@ export function ActivityDetailsSheet({
     };
 
     const deleteChecklistItem = async (id: string) => {
-        if (!id.startsWith('temp-')) {
-            // If it's a real item, delete from DB immediately (or mark for deletion)
-            // For immediate feedback:
-            await supabase.from('checklist_items').delete().eq('id', id);
-        }
+        // Checklist delete disabled - table doesn't exist yet
         setChecklistItems(prev => prev.filter(item => item.id !== id));
     };
 
