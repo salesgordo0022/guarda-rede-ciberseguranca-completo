@@ -78,35 +78,22 @@ export const ProfileSettings = () => {
       // 1. Create Company
       const { data: company, error: companyError } = await supabase
         .from('companies')
-        .insert({ name })
+        .insert({ name, created_by: user.id })
         .select()
         .single();
 
       if (companyError) throw companyError;
 
       // 2. Link user to company (user_companies)
-      // Nota: No banco real isso poderia ser via trigger, mas no mock fazemos manual
       const { error: linkError } = await supabase
         .from('user_companies')
         .insert({
           user_id: user.id,
-          company_id: company.id
+          company_id: company.id,
+          role: 'admin' as const
         });
 
       if (linkError) throw linkError;
-
-      // 3. Update profile role to admin
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({
-          user_id: user.id,
-          role: 'admin' // Quem cria a empresa vira admin
-        });
-
-      // Se der erro de duplicate key no role, tentamos update (embora insert deva funcionar no mock)
-      if (roleError) {
-        await supabase.from('profiles').update({ role: 'admin' }).eq('id', user.id);
-      }
 
       return company;
     },
@@ -114,7 +101,7 @@ export const ProfileSettings = () => {
       refetchProfile();
       toast.success("Empresa criada com sucesso!");
       setCompanyName("");
-      window.location.reload(); // Forçar reload para atualizar todos os contextos
+      window.location.reload();
     },
     onError: (error: Error) => {
       toast.error("Erro ao criar empresa: " + error.message);
@@ -227,7 +214,7 @@ export const ProfileSettings = () => {
           <div className="flex items-center gap-6">
             <div className="relative">
               <Avatar className="h-24 w-24">
-                <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.full_name} />
+                <AvatarImage src={(profile as any)?.avatar_url || undefined} alt={profile?.full_name} />
                 <AvatarFallback className="text-2xl bg-primary text-primary-foreground">
                   {getInitials(profile?.full_name || "U")}
                 </AvatarFallback>
@@ -255,7 +242,7 @@ export const ProfileSettings = () => {
             </div>
             <div>
               <h3 className="font-medium">{profile?.full_name}</h3>
-              <p className="text-sm text-muted-foreground">{profile?.email}</p>
+              <p className="text-sm text-muted-foreground">{user?.email}</p>
               <p className="text-xs text-muted-foreground mt-1">
                 Clique no ícone da câmera para alterar a foto
               </p>
