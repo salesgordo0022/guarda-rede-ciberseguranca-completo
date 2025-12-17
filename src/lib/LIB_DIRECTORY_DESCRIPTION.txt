@@ -1,0 +1,21 @@
+# Descrição do Diretório lib/
+
+Este diretório contém funções utilitárias e bibliotecas auxiliares compartilhadas em toda a aplicação.
+
+## Arquivos:
+
+1. **utils.ts**:
+   - Funções utilitárias genéricas
+   - Funções de ajuda para manipulação de strings, arrays, objetos
+   - Funções para formatação e transformação de dados
+
+## Propósito:
+- Armazenar funções utilitárias reutilizáveis
+- Evitar duplicação de código
+- Centralizar funções de uso comum
+- Facilitar a manutenção de utilitários
+
+## Características:
+- Funções puras que não têm efeitos colaterais
+- Utilitários que podem ser usados em qualquer parte da aplicação
+- Código auxiliar que complementa a lógica principal

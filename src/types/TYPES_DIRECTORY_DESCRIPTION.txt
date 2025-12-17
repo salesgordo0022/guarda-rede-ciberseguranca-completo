@@ -1,0 +1,23 @@
+# Descrição do Diretório types/
+
+Este diretório contém definições de tipos TypeScript utilizados em toda a aplicação para garantir segurança de tipos e autocomplete.
+
+## Arquivos:
+
+1. **task.ts**:
+   - Definições de interfaces e tipos relacionados a tarefas
+   - Enums para status, prioridade e outros atributos de tarefas
+   - Tipos para métricas e filtros de tarefas
+   - Interfaces para tarefas com relacionamentos
+
+## Propósito:
+- Definir contratos claros para objetos e dados da aplicação
+- Garantir segurança de tipos em tempo de compilação
+- Facilitar o autocomplete e IntelliSense no desenvolvimento
+- Centralizar definições de tipos para fácil manutenção
+
+## Características:
+- Interfaces TypeScript para objetos complexos
+- Enums para valores pré-definidos
+- Tipos personalizados para estruturas de dados específicas
+- Compatíveis com as tabelas do banco de dados Supabase

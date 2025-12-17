@@ -1,0 +1,40 @@
+# Descrição do Diretório hooks/
+
+Este diretório contém hooks React personalizados que encapsulam lógica reutilizável da aplicação.
+
+## Hooks Disponíveis:
+
+1. **useAuth.tsx**:
+   - Gerencia autenticação de usuários
+   - Controla estado de sessão e perfil do usuário
+   - Fornece contexto de autenticação para toda a aplicação
+
+2. **usePermissions.tsx**:
+   - Gerencia permissões baseadas em papéis de usuário
+   - Controla acesso a funcionalidades específicas
+   - Verifica se o usuário tem permissão para realizar ações
+
+3. **useSystemSettings.tsx**:
+   - Gerencia configurações do sistema
+   - Controla temas, cores e preferências do usuário
+   - Armazena e recupera configurações do sistema
+
+4. **useTasks.tsx**:
+   - Gerencia operações CRUD de tarefas
+   - Integra com React Query para gerenciamento de estado assíncrono
+   - Fornece funções para criar, atualizar, deletar e buscar tarefas
+
+5. **use-toast.ts**:
+   - Hook para exibição de notificações/toasts
+   - Gerencia estado das mensagens de notificação
+   - Parte da biblioteca sonner
+
+6. **use-mobile.tsx**:
+   - Detecta se a aplicação está sendo executada em dispositivo móvel
+   - Ajuda na implementação de layouts responsivos
+
+## Propósito:
+- Encapsular lógica complexa em funções reutilizáveis
+- Separar preocupações entre lógica de negócios e apresentação
+- Compartilhar estado entre diferentes componentes
+- Melhorar a testabilidade e manutenção do código
