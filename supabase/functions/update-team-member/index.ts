@@ -134,13 +134,24 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Update departments
+    // Update departments - only for the current company
     if (departmentIds !== undefined) {
-      // Remove existing department assignments
-      await supabaseAdmin
-        .from("user_departments")
-        .delete()
-        .eq("user_id", userId);
+      // Get departments of the current company
+      const { data: companyDepts } = await supabaseAdmin
+        .from("departments")
+        .select("id")
+        .eq("company_id", companyId);
+
+      const companyDeptIds = companyDepts?.map(d => d.id) || [];
+
+      if (companyDeptIds.length > 0) {
+        // Remove only the department assignments for this company's departments
+        await supabaseAdmin
+          .from("user_departments")
+          .delete()
+          .eq("user_id", userId)
+          .in("department_id", companyDeptIds);
+      }
 
       // Add new department assignments
       if (departmentIds.length > 0) {

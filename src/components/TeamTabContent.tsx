@@ -256,15 +256,16 @@ export const TeamTabContent = () => {
 
             if (profilesError) throw profilesError;
 
-            // Buscar departamentos dos usuários (um usuário pode ter vários)
+            // Buscar departamentos dos usuários (apenas da empresa selecionada)
             const { data: userDepts, error: deptsError } = await supabase
                 .from("user_departments")
                 .select(`
                     user_id,
                     department_id,
-                    department:departments(id, name)
+                    department:departments!inner(id, name, company_id)
                 `)
-                .in("user_id", userIds);
+                .in("user_id", userIds)
+                .eq("department.company_id", selectedCompanyId);
 
             if (deptsError) throw deptsError;
 
