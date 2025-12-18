@@ -1,15 +1,15 @@
-import { useState, useEffect } from "react";
-import { Plus, Search, Grid, Kanban } from "lucide-react";
+import { useState } from "react";
+import { Plus, Search, Grid, Kanban, Trash2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-
 interface Project {
   id: string;
   name: string;
@@ -39,6 +39,7 @@ const Projects = () => {
   const [projectName, setProjectName] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
   const [viewMode, setViewMode] = useState<'grid' | 'kanban'>('grid');
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
 
   // Fetch projects
   const { data: projects = [], isLoading, error } = useQuery({
@@ -198,6 +199,32 @@ const Projects = () => {
     }
   };
 
+  // Delete project mutation
+  const deleteProjectMutation = useMutation({
+    mutationFn: async (projectId: string) => {
+      const { error } = await supabase
+        .from("projects")
+        .delete()
+        .eq("id", projectId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Projeto excluído com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ["all-project-activities"] });
+      setProjectToDelete(null);
+    },
+    onError: (error) => {
+      toast.error("Erro ao excluir projeto: " + (error as Error).message);
+    },
+  });
+
+  const handleDeleteProject = (e: React.MouseEvent, project: Project) => {
+    e.stopPropagation();
+    setProjectToDelete(project);
+  };
+
   if (error) {
     return (
       <div className="p-6">
@@ -341,7 +368,17 @@ const Projects = () => {
                 >
                   <CardHeader>
                     <CardTitle className="flex items-start justify-between">
-                      <span className="truncate">{project.name}</span>
+                      <span className="truncate flex-1">{project.name}</span>
+                      {isAdmin && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
+                          onClick={(e) => handleDeleteProject(e, project)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </CardTitle>
                     <CardDescription className="line-clamp-2">
                       {project.description || "Sem descrição"}
@@ -440,6 +477,28 @@ const Projects = () => {
           </div>
         </div>
       )}
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={!!projectToDelete} onOpenChange={(open) => !open && setProjectToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Projeto</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o projeto "{projectToDelete?.name}"? 
+              Esta ação não pode ser desfeita e todas as atividades do projeto também serão excluídas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => projectToDelete && deleteProjectMutation.mutate(projectToDelete.id)}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
