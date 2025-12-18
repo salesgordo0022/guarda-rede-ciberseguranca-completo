@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
     Select,
     SelectContent,
@@ -25,7 +24,8 @@ import {
     FolderKanban,
     MessageSquare,
     CheckCircle2,
-    AlertCircle,
+    Target,
+    Clock,
     Save,
     Plus,
     Trash2,
@@ -54,7 +54,6 @@ interface Comment {
     content: string;
     user_id: string;
     created_at: string;
-    user_name?: string;
 }
 
 interface HistoryEntry {
@@ -65,7 +64,6 @@ interface HistoryEntry {
     new_value: string | null;
     user_id: string;
     created_at: string;
-    user_name?: string;
 }
 
 interface Note {
@@ -73,7 +71,6 @@ interface Note {
     content: string;
     user_id: string;
     created_at: string;
-    user_name?: string;
 }
 
 interface ActivityDetailsSheetProps {
@@ -96,12 +93,12 @@ export function ActivityDetailsSheet({
     const { profile, selectedCompanyId } = useAuth();
     const queryClient = useQueryClient();
     const [loading, setLoading] = useState(false);
-    const [activeTab, setActiveTab] = useState("details");
 
     // Form State
     const [formData, setFormData] = useState({
         name: "",
         status: "pendente",
+        goal_date: "",
         deadline: "",
         description: "",
         priority: "media"
@@ -149,7 +146,6 @@ export function ActivityDetailsSheet({
     const fetchActivityData = async () => {
         if (!initialActivity?.id) return;
 
-        // Fetch checklist
         const { data: checklistData } = await supabase
             .from('department_activity_checklist')
             .select('*')
@@ -157,7 +153,6 @@ export function ActivityDetailsSheet({
             .order('order_index');
         if (checklistData) setChecklist(checklistData);
 
-        // Fetch comments
         const { data: commentsData } = await supabase
             .from('department_activity_comments')
             .select('*')
@@ -165,7 +160,6 @@ export function ActivityDetailsSheet({
             .order('created_at', { ascending: false });
         if (commentsData) setComments(commentsData);
 
-        // Fetch history
         const { data: historyData } = await supabase
             .from('department_activity_history')
             .select('*')
@@ -173,7 +167,6 @@ export function ActivityDetailsSheet({
             .order('created_at', { ascending: false });
         if (historyData) setHistory(historyData);
 
-        // Fetch notes
         const { data: notesData } = await supabase
             .from('department_activity_notes')
             .select('*')
@@ -189,6 +182,7 @@ export function ActivityDetailsSheet({
                 setFormData({
                     name: initialActivity.name || "",
                     status: initialActivity.status || "pendente",
+                    goal_date: initialActivity.goal_date ? initialActivity.goal_date.split('T')[0] : "",
                     deadline: initialActivity.deadline ? initialActivity.deadline.split('T')[0] : "",
                     description: initialActivity.description || "",
                     priority: initialActivity.priority || "media"
@@ -197,6 +191,7 @@ export function ActivityDetailsSheet({
                 setFormData({
                     name: "",
                     status: "pendente",
+                    goal_date: "",
                     deadline: "",
                     description: "",
                     priority: "media"
@@ -235,7 +230,8 @@ export function ActivityDetailsSheet({
                 name: formData.name,
                 status: formData.status,
                 description: formData.description,
-                deadline: formData.deadline ? formData.deadline : null,
+                goal_date: formData.goal_date || null,
+                deadline: formData.deadline || null,
                 priority: formData.priority
             };
 
@@ -244,7 +240,7 @@ export function ActivityDetailsSheet({
             if (mode === 'create') {
                 if (isProject) {
                     activityData.project_id = preselectedProjectId;
-                    delete activityData.priority; // project_activities may not have priority
+                    delete activityData.priority;
                 } else {
                     activityData.department_id = preselectedDepartmentId;
                 }
@@ -265,7 +261,6 @@ export function ActivityDetailsSheet({
 
                 toast.success("Atividade criada com sucesso!");
             } else {
-                // Check for changes and record history
                 if (!isProject && initialActivity) {
                     if (initialActivity.status !== formData.status) {
                         await recordHistory(activityId!, 'alterou', 'status', initialActivity.status, formData.status);
@@ -279,7 +274,7 @@ export function ActivityDetailsSheet({
                 }
 
                 const updateData = isProject 
-                    ? { name: formData.name, status: formData.status, description: formData.description, deadline: formData.deadline || null }
+                    ? { name: formData.name, status: formData.status, description: formData.description, goal_date: formData.goal_date || null, deadline: formData.deadline || null }
                     : activityData;
 
                 const { error } = await supabase
@@ -404,15 +399,6 @@ export function ActivityDetailsSheet({
         </div>
     );
 
-    const getPriorityLabel = (priority: string) => {
-        switch (priority) {
-            case 'urgente': return 'Urgente';
-            case 'nao_urgente': return 'Não Urgente';
-            case 'media': return 'Média Urgência';
-            default: return 'Média Urgência';
-        }
-    };
-
     const getPriorityColor = (priority: string) => {
         switch (priority) {
             case 'urgente': return 'bg-red-500/10 text-red-500 border-red-500/20';
@@ -443,6 +429,7 @@ export function ActivityDetailsSheet({
     };
 
     const isProjectActivity = preselectedProjectId || (initialActivity && !initialActivity.department_id);
+    const isDepartmentActivity = !isProjectActivity;
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
@@ -499,7 +486,7 @@ export function ActivityDetailsSheet({
                                 </Select>
                             </InputWrapper>
 
-                            {!isProjectActivity && (
+                            {isDepartmentActivity && (
                                 <InputWrapper icon={Flag} label="Prioridade">
                                     <Select value={formData.priority} onValueChange={(val) => handleChange('priority', val)}>
                                         <SelectTrigger className={`w-[180px] ${getPriorityColor(formData.priority)}`}>
@@ -533,13 +520,28 @@ export function ActivityDetailsSheet({
                                 </div>
                             </InputWrapper>
 
-                            <InputWrapper icon={AlertCircle} label="Prazo / Meta">
-                                <Input
-                                    type="date"
-                                    value={formData.deadline}
-                                    onChange={(e) => handleChange('deadline', e.target.value)}
-                                    className="w-[180px]"
-                                />
+                            <InputWrapper icon={Target} label="Meta">
+                                <div className="flex items-center gap-2">
+                                    <Input
+                                        type="date"
+                                        value={formData.goal_date}
+                                        onChange={(e) => handleChange('goal_date', e.target.value)}
+                                        className="w-[180px]"
+                                    />
+                                    <span className="text-xs text-muted-foreground">Data objetivo</span>
+                                </div>
+                            </InputWrapper>
+
+                            <InputWrapper icon={Clock} label="Prazo">
+                                <div className="flex items-center gap-2">
+                                    <Input
+                                        type="date"
+                                        value={formData.deadline}
+                                        onChange={(e) => handleChange('deadline', e.target.value)}
+                                        className="w-[180px]"
+                                    />
+                                    <span className="text-xs text-muted-foreground">Última data limite</span>
+                                </div>
                             </InputWrapper>
 
                             {initialActivity?.created_at && (
@@ -563,51 +565,34 @@ export function ActivityDetailsSheet({
                                 value={formData.description}
                                 onChange={(e) => handleChange('description', e.target.value)}
                                 placeholder="Adicione uma descrição detalhada..."
-                                className="min-h-[120px] resize-none"
+                                className="min-h-[100px] resize-none"
                             />
                         </div>
 
-                        <Separator />
-
-                        {/* Tabs for additional sections */}
-                        {mode === 'view' && initialActivity?.id && !isProjectActivity && (
-                            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                                <TabsList className="grid w-full grid-cols-4">
-                                    <TabsTrigger value="checklist" className="gap-1">
+                        {/* Checklist Section */}
+                        {mode === 'view' && initialActivity?.id && isDepartmentActivity && (
+                            <>
+                                <Separator />
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-2 text-muted-foreground font-medium">
                                         <ListChecks className="h-4 w-4" />
-                                        <span className="hidden sm:inline">Checklist</span>
-                                    </TabsTrigger>
-                                    <TabsTrigger value="comments" className="gap-1">
-                                        <MessageSquare className="h-4 w-4" />
-                                        <span className="hidden sm:inline">Comentários</span>
-                                    </TabsTrigger>
-                                    <TabsTrigger value="history" className="gap-1">
-                                        <History className="h-4 w-4" />
-                                        <span className="hidden sm:inline">Histórico</span>
-                                    </TabsTrigger>
-                                    <TabsTrigger value="notes" className="gap-1">
-                                        <BookOpen className="h-4 w-4" />
-                                        <span className="hidden sm:inline">Diário</span>
-                                    </TabsTrigger>
-                                </TabsList>
-
-                                {/* Checklist Tab */}
-                                <TabsContent value="checklist" className="mt-4 space-y-4">
+                                        Checklist - Passos da Atividade
+                                    </div>
                                     <div className="flex gap-2">
                                         <Input
                                             value={newChecklistItem}
                                             onChange={(e) => setNewChecklistItem(e.target.value)}
-                                            placeholder="Novo item do checklist..."
+                                            placeholder="Adicionar novo passo..."
                                             onKeyDown={(e) => e.key === 'Enter' && addChecklistItem()}
                                         />
                                         <Button onClick={addChecklistItem} size="icon" variant="outline">
                                             <Plus className="h-4 w-4" />
                                         </Button>
                                     </div>
-                                    <div className="space-y-2">
+                                    <div className="space-y-2 max-h-[200px] overflow-y-auto">
                                         {checklist.length === 0 ? (
                                             <p className="text-sm text-muted-foreground text-center py-4">
-                                                Nenhum item no checklist
+                                                Nenhum passo adicionado
                                             </p>
                                         ) : (
                                             checklist.map((item) => (
@@ -634,7 +619,7 @@ export function ActivityDetailsSheet({
                                     {checklist.length > 0 && (
                                         <div className="pt-2">
                                             <div className="flex items-center justify-between text-sm mb-1">
-                                                <span className="text-muted-foreground">Progresso</span>
+                                                <span className="text-muted-foreground">Progresso do Checklist</span>
                                                 <span className="font-medium">
                                                     {Math.round((checklist.filter(c => c.completed).length / checklist.length) * 100)}%
                                                 </span>
@@ -647,10 +632,19 @@ export function ActivityDetailsSheet({
                                             </div>
                                         </div>
                                     )}
-                                </TabsContent>
+                                </div>
+                            </>
+                        )}
 
-                                {/* Comments Tab */}
-                                <TabsContent value="comments" className="mt-4 space-y-4">
+                        {/* Comments Section */}
+                        {mode === 'view' && initialActivity?.id && isDepartmentActivity && (
+                            <>
+                                <Separator />
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-2 text-muted-foreground font-medium">
+                                        <MessageSquare className="h-4 w-4" />
+                                        Comentários
+                                    </div>
                                     <div className="flex gap-2">
                                         <Input
                                             value={newComment}
@@ -662,7 +656,7 @@ export function ActivityDetailsSheet({
                                             <Send className="h-4 w-4" />
                                         </Button>
                                     </div>
-                                    <div className="space-y-3 max-h-[300px] overflow-y-auto">
+                                    <div className="space-y-3 max-h-[200px] overflow-y-auto">
                                         {comments.length === 0 ? (
                                             <p className="text-sm text-muted-foreground text-center py-4">
                                                 Nenhum comentário ainda
@@ -686,11 +680,63 @@ export function ActivityDetailsSheet({
                                             ))
                                         )}
                                     </div>
-                                </TabsContent>
+                                </div>
+                            </>
+                        )}
 
-                                {/* History Tab */}
-                                <TabsContent value="history" className="mt-4">
+                        {/* Diário de Bordo Section */}
+                        {mode === 'view' && initialActivity?.id && isDepartmentActivity && (
+                            <>
+                                <Separator />
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-2 text-muted-foreground font-medium">
+                                        <BookOpen className="h-4 w-4" />
+                                        Diário de Bordo
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Textarea
+                                            value={newNote}
+                                            onChange={(e) => setNewNote(e.target.value)}
+                                            placeholder="Escreva o que quiser sobre esta atividade..."
+                                            className="min-h-[100px] resize-none"
+                                        />
+                                        <Button onClick={addNote} size="sm" variant="outline" className="gap-2">
+                                            <Plus className="h-4 w-4" />
+                                            Adicionar ao Diário
+                                        </Button>
+                                    </div>
                                     <div className="space-y-3 max-h-[300px] overflow-y-auto">
+                                        {notes.map((note) => (
+                                            <div key={note.id} className="p-3 rounded-lg border bg-card space-y-2">
+                                                <div className="flex items-center gap-2">
+                                                    <Avatar className="h-6 w-6">
+                                                        <AvatarFallback className="text-xs bg-primary/10">
+                                                            {getUserName(note.user_id).charAt(0).toUpperCase()}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                    <span className="text-sm font-medium">{getUserName(note.user_id)}</span>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {format(new Date(note.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                                                    </span>
+                                                </div>
+                                                <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </>
+                        )}
+
+                        {/* History Section */}
+                        {mode === 'view' && initialActivity?.id && isDepartmentActivity && (
+                            <>
+                                <Separator />
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-2 text-muted-foreground font-medium">
+                                        <History className="h-4 w-4" />
+                                        Histórico de Alterações
+                                    </div>
+                                    <div className="space-y-3 max-h-[200px] overflow-y-auto">
                                         {history.length === 0 ? (
                                             <p className="text-sm text-muted-foreground text-center py-4">
                                                 Nenhum histórico de alterações
@@ -727,73 +773,35 @@ export function ActivityDetailsSheet({
                                             ))
                                         )}
                                     </div>
-                                </TabsContent>
-
-                                {/* Notes Tab (Diário de Bordo) */}
-                                <TabsContent value="notes" className="mt-4 space-y-4">
-                                    <div className="space-y-2">
-                                        <Textarea
-                                            value={newNote}
-                                            onChange={(e) => setNewNote(e.target.value)}
-                                            placeholder="Escreva uma nota para o diário de bordo..."
-                                            className="min-h-[80px] resize-none"
-                                        />
-                                        <Button onClick={addNote} size="sm" variant="outline" className="gap-2">
-                                            <Plus className="h-4 w-4" />
-                                            Adicionar Nota
-                                        </Button>
-                                    </div>
-                                    <Separator />
-                                    <div className="space-y-3 max-h-[250px] overflow-y-auto">
-                                        {notes.length === 0 ? (
-                                            <p className="text-sm text-muted-foreground text-center py-4">
-                                                Nenhuma nota no diário de bordo
-                                            </p>
-                                        ) : (
-                                            notes.map((note) => (
-                                                <div key={note.id} className="p-3 rounded-lg border bg-card space-y-2">
-                                                    <div className="flex items-center gap-2">
-                                                        <Avatar className="h-6 w-6">
-                                                            <AvatarFallback className="text-xs bg-primary/10">
-                                                                {getUserName(note.user_id).charAt(0).toUpperCase()}
-                                                            </AvatarFallback>
-                                                        </Avatar>
-                                                        <span className="text-sm font-medium">{getUserName(note.user_id)}</span>
-                                                        <span className="text-xs text-muted-foreground">
-                                                            {format(new Date(note.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                                                        </span>
-                                                    </div>
-                                                    <p className="text-sm whitespace-pre-wrap">{note.content}</p>
-                                                </div>
-                                            ))
-                                        )}
-                                    </div>
-                                </TabsContent>
-                            </Tabs>
+                                </div>
+                            </>
                         )}
 
                         {/* Progress Section based on Status */}
                         {mode === 'view' && (
-                            <div className="space-y-3 pt-4">
-                                <div className="flex items-center justify-between text-sm">
-                                    <span className="text-muted-foreground font-medium">Progresso da Atividade</span>
-                                    <span className="font-medium">{getProgressFromStatus(formData.status)}%</span>
+                            <>
+                                <Separator />
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-muted-foreground font-medium">Progresso da Atividade</span>
+                                        <span className="font-medium">{getProgressFromStatus(formData.status)}%</span>
+                                    </div>
+                                    <div className="h-3 bg-muted rounded-full overflow-hidden">
+                                        <div 
+                                            className={`h-full transition-all ${
+                                                formData.status === 'concluida' ? 'bg-green-500' :
+                                                formData.status === 'em_andamento' ? 'bg-blue-500' :
+                                                formData.status === 'cancelada' ? 'bg-red-500' :
+                                                'bg-muted-foreground/30'
+                                            }`}
+                                            style={{ width: `${getProgressFromStatus(formData.status)}%` }}
+                                        />
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                        Status: {getStatusLabel(formData.status)}
+                                    </p>
                                 </div>
-                                <div className="h-3 bg-muted rounded-full overflow-hidden">
-                                    <div 
-                                        className={`h-full transition-all ${
-                                            formData.status === 'concluida' ? 'bg-green-500' :
-                                            formData.status === 'em_andamento' ? 'bg-blue-500' :
-                                            formData.status === 'cancelada' ? 'bg-red-500' :
-                                            'bg-muted-foreground/30'
-                                        }`}
-                                        style={{ width: `${getProgressFromStatus(formData.status)}%` }}
-                                    />
-                                </div>
-                                <p className="text-xs text-muted-foreground">
-                                    Status: {getStatusLabel(formData.status)}
-                                </p>
-                            </div>
+                            </>
                         )}
                     </div>
                 </ScrollArea>

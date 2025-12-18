@@ -32,6 +32,7 @@ interface DepartmentActivity {
   description: string | null;
   status: ActivityStatus;
   deadline: string | null;
+  goal_date: string | null;
   scheduled_date: string | null;
   deadline_status: Database['public']['Enums']['deadline_status'] | null;
   updated_at: string;
@@ -171,6 +172,7 @@ const Activities = () => {
         description: activity.description,
         status: activity.status,
         deadline: activity.deadline,
+        goal_date: activity.goal_date,
         scheduled_date: activity.scheduled_date,
         deadline_status: activity.deadline_status,
         updated_at: activity.updated_at,
