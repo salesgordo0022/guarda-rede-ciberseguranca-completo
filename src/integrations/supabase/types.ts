@@ -928,6 +928,10 @@ export type Database = {
         Args: { _department_id: string; _user_id: string }
         Returns: boolean
       }
+      user_is_project_member_or_admin: {
+        Args: { _project_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       activity_status: "pendente" | "em_andamento" | "concluida" | "cancelada"
