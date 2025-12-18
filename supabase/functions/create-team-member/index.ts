@@ -3,18 +3,18 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders, status: 200 });
   }
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     
-    // Client with service role for admin operations
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
       auth: {
         autoRefreshToken: false,
@@ -22,7 +22,6 @@ Deno.serve(async (req) => {
       },
     });
 
-    // Get the authorization header to verify the calling user
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(
@@ -31,7 +30,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Verify the calling user is an admin
     const token = authHeader.replace("Bearer ", "");
     const { data: { user: callingUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
     
@@ -42,9 +40,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { email, fullName, companyId, role, departmentIds } = await req.json();
+    const { email, fullName, companyId, role, departmentIds, password } = await req.json();
 
-    // Verify the calling user is an admin of the company
+    console.log("Creating user:", { email, fullName, companyId, role });
+
     const { data: userCompany } = await supabaseAdmin
       .from("user_companies")
       .select("role")
@@ -59,14 +58,12 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check if user already exists
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
     const existingUser = existingUsers?.users?.find(u => u.email === email);
 
     let userId: string;
 
     if (existingUser) {
-      // User already exists, check if already in this company
       const { data: existingCompanyLink } = await supabaseAdmin
         .from("user_companies")
         .select("id")
@@ -84,11 +81,12 @@ Deno.serve(async (req) => {
       userId = existingUser.id;
       console.log("User exists, adding to company:", userId);
     } else {
-      // Create the new user with admin API
-      const tempPassword = Math.random().toString(36).slice(-12) + "A1!";
+      // Use the password provided by admin or generate a temporary one
+      const userPassword = password || Math.random().toString(36).slice(-12) + "A1!";
+      
       const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
         email,
-        password: tempPassword,
+        password: userPassword,
         email_confirm: true,
         user_metadata: {
           full_name: fullName,
@@ -146,12 +144,6 @@ Deno.serve(async (req) => {
         console.error("Failed to add user to departments:", deptError);
       }
     }
-
-    // Send password reset email so user can set their own password
-    await supabaseAdmin.auth.admin.generateLink({
-      type: "recovery",
-      email: email,
-    });
 
     return new Response(
       JSON.stringify({ 
