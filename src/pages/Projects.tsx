@@ -3,13 +3,12 @@ import { Plus, Search, Grid, Kanban, Trash2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { CreateProjectDialog } from "@/components/CreateProjectDialog";
 interface Project {
   id: string;
   name: string;
@@ -36,27 +35,50 @@ const Projects = () => {
   const queryClient = useQueryClient();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [projectName, setProjectName] = useState("");
-  const [projectDescription, setProjectDescription] = useState("");
   const [viewMode, setViewMode] = useState<'grid' | 'kanban'>('grid');
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
 
-  // Fetch projects
+  // Fetch projects with member filtering
   const { data: projects = [], isLoading, error } = useQuery({
-    queryKey: ["projects", selectedCompanyId],
+    queryKey: ["projects", selectedCompanyId, profile?.id, isAdmin],
     queryFn: async () => {
-      if (!selectedCompanyId) return [];
+      if (!selectedCompanyId || !profile?.id) return [];
 
+      // Admin vê todos os projetos
+      if (isAdmin) {
+        const { data, error } = await supabase
+          .from("projects")
+          .select("*")
+          .eq("company_id", selectedCompanyId)
+          .order("created_at", { ascending: false });
+
+        if (error) throw error;
+        return data as Project[];
+      }
+
+      // Não-admin: busca projetos onde é membro ou criador
+      // 1. Buscar IDs dos projetos onde é membro
+      const { data: memberProjects, error: memberError } = await supabase
+        .from("project_members")
+        .select("project_id")
+        .eq("user_id", profile.id);
+
+      if (memberError) throw memberError;
+
+      const memberProjectIds = memberProjects?.map(m => m.project_id) || [];
+
+      // 2. Buscar projetos onde é criador OU é membro
       const { data, error } = await supabase
         .from("projects")
         .select("*")
         .eq("company_id", selectedCompanyId)
+        .or(`created_by.eq.${profile.id},id.in.(${memberProjectIds.length > 0 ? memberProjectIds.join(',') : '00000000-0000-0000-0000-000000000000'})`)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
       return data as Project[];
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!selectedCompanyId && !!profile?.id,
   });
 
   // Fetch all project activities
@@ -169,36 +191,6 @@ const Projects = () => {
 
   const categorizedActivities = categorizeActivities();
 
-  const handleCreateProject = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!selectedCompanyId || !profile?.id) {
-      toast.error("Erro: Empresa não encontrada ou usuário não autenticado");
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from("projects")
-        .insert({
-          name: projectName,
-          description: projectDescription,
-          company_id: selectedCompanyId,
-          created_by: profile.id,
-        });
-
-      if (error) throw error;
-
-      toast.success("Projeto criado com sucesso!");
-      setIsCreateDialogOpen(false);
-      setProjectName("");
-      setProjectDescription("");
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
-    } catch (error) {
-      toast.error("Erro ao criar projeto: " + (error as Error).message);
-    }
-  };
-
   // Delete project mutation
   const deleteProjectMutation = useMutation({
     mutationFn: async (projectId: string) => {
@@ -275,46 +267,16 @@ const Projects = () => {
           </div>
 
           {isAdmin && (
-            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-              <DialogTrigger asChild>
+            <CreateProjectDialog
+              open={isCreateDialogOpen}
+              onOpenChange={setIsCreateDialogOpen}
+              trigger={
                 <Button className="bg-primary hover:bg-primary/90">
                   <Plus className="h-4 w-4 mr-2" />
                   Novo Projeto
                 </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Criar Novo Projeto</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleCreateProject} className="space-y-4 pt-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="projectName">Nome do Projeto *</Label>
-                    <Input
-                      id="projectName"
-                      value={projectName}
-                      onChange={(e) => setProjectName(e.target.value)}
-                      placeholder="Ex: Projeto de Expansão"
-                      required
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="projectDescription">Descrição</Label>
-                    <textarea
-                      id="projectDescription"
-                      value={projectDescription}
-                      onChange={(e) => setProjectDescription(e.target.value)}
-                      placeholder="Descreva o objetivo do projeto..."
-                      className="w-full min-h-[100px] p-3 border rounded-md bg-background text-foreground"
-                    />
-                  </div>
-                  
-                  <Button type="submit" className="w-full">
-                    Criar Projeto
-                  </Button>
-                </form>
-              </DialogContent>
-            </Dialog>
+              }
+            />
           )}
         </div>
       </div>
