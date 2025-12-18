@@ -45,7 +45,7 @@ export function AppSidebar() {
   const { open } = useSidebar();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
-  const { profile, signOut, selectedCompanyId, setSelectedCompanyId } = useAuth();
+  const { profile, signOut, selectedCompanyId, setSelectedCompanyId, isAdmin, refetchProfile } = useAuth();
   const [newCompanyName, setNewCompanyName] = useState("");
   const [isCreatingCompany, setIsCreatingCompany] = useState(false);
 
@@ -77,20 +77,8 @@ export function AppSidebar() {
     enabled: !!selectedCompanyId,
   });
 
-  // Buscar role do usuário
-  const { data: userRole } = useQuery({
-    queryKey: ['user-role', profile?.id],
-    queryFn: async () => {
-      if (!profile?.id) return null;
-      const { data } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', profile.id)
-        .single();
-      return data?.role || 'colaborador';
-    },
-    enabled: !!profile?.id
-  });
+  // Usa a role diretamente do profile (que agora vem correta da user_companies)
+  const userRole = profile?.role || 'colaborador';
 
   const handleCreateCompany = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -154,12 +142,19 @@ export function AppSidebar() {
                 <div className="font-bold text-sidebar-foreground inline-flex items-center gap-1">
                   {profile?.full_name || 'Usuário'}
                 </div>
-                <p className="text-sm text-sidebar-foreground/70 capitalize">{userRole || 'Visitante'}</p>
+                <p className="text-sm text-sidebar-foreground/70 capitalize">{userRole}</p>
               </div>
             </div>
 
             <div className="w-full">
-              <Select value={selectedCompanyId || ""} onValueChange={setSelectedCompanyId}>
+              <Select 
+                value={selectedCompanyId || ""} 
+                onValueChange={(value) => {
+                  setSelectedCompanyId(value);
+                  // Refetch para atualizar a role da empresa selecionada
+                  setTimeout(() => refetchProfile(), 100);
+                }}
+              >
                 <SelectTrigger className="w-full bg-sidebar-accent border-sidebar-border text-sidebar-foreground">
                   <SelectValue placeholder="Selecione a Empresa" />
                 </SelectTrigger>
@@ -169,21 +164,23 @@ export function AppSidebar() {
                       {company.name}
                     </SelectItem>
                   ))}
-                  <div className="p-2 border-t mt-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="w-full justify-start h-8 px-2 text-xs"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setIsCreatingCompany(true);
-                      }}
-                    >
-                      <Plus className="h-3 w-3 mr-2" />
-                      Criar Nova Empresa
-                    </Button>
-                  </div>
+                  {isAdmin && (
+                    <div className="p-2 border-t mt-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full justify-start h-8 px-2 text-xs"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setIsCreatingCompany(true);
+                        }}
+                      >
+                        <Plus className="h-3 w-3 mr-2" />
+                        Criar Nova Empresa
+                      </Button>
+                    </div>
+                  )}
                 </SelectContent>
               </Select>
             </div>
