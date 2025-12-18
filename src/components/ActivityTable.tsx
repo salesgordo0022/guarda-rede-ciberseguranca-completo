@@ -2,7 +2,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Pencil, Trash2, CheckCircle, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Pencil, Trash2, CheckCircle, AlertCircle } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Database } from "@/integrations/supabase/types";
@@ -24,6 +24,7 @@ interface Activity {
   description?: string | null;
   status: ActivityStatus;
   deadline?: string | null;
+  goal_date?: string | null;
   scheduled_date?: string | null;
   deadline_status?: DeadlineStatus | null;
   updated_at: string;
@@ -33,6 +34,25 @@ interface Activity {
     name: string;
   } | null;
 }
+
+const getProgressFromStatus = (status: ActivityStatus) => {
+  switch (status) {
+    case 'pendente': return 0;
+    case 'em_andamento': return 50;
+    case 'concluida': return 100;
+    case 'cancelada': return 0;
+    default: return 0;
+  }
+};
+
+const getProgressColor = (status: ActivityStatus) => {
+  switch (status) {
+    case 'concluida': return 'bg-emerald-500';
+    case 'em_andamento': return 'bg-blue-500';
+    case 'cancelada': return 'bg-red-500';
+    default: return 'bg-gray-300';
+  }
+};
 
 interface ActivityTableProps {
   activities: Activity[];
@@ -122,11 +142,13 @@ export const ActivityTable = ({
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/50 hover:bg-muted/50 text-xs uppercase">
-            <TableHead className="w-[280px]">Atividades</TableHead>
-            <TableHead className="w-[180px]">Responsável</TableHead>
+            <TableHead className="w-[250px]">Atividades</TableHead>
+            <TableHead className="w-[150px]">Responsável</TableHead>
             <TableHead className="w-[100px]">Prioridade</TableHead>
             <TableHead className="w-[130px]">Status</TableHead>
+            <TableHead className="w-[120px]">Progresso</TableHead>
             <TableHead className="w-[100px]">Departamento</TableHead>
+            <TableHead className="w-[100px]">Meta</TableHead>
             <TableHead className="w-[100px]">Prazo</TableHead>
             {showActions && <TableHead className="text-right w-[80px]">Ações</TableHead>}
           </TableRow>
@@ -134,13 +156,13 @@ export const ActivityTable = ({
         <TableBody>
           {isLoading ? (
             <TableRow>
-              <TableCell colSpan={showActions ? 7 : 6} className="text-center py-8">
+              <TableCell colSpan={showActions ? 9 : 8} className="text-center py-8">
                 Carregando atividades...
               </TableCell>
             </TableRow>
           ) : activities.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={showActions ? 7 : 6} className="text-center text-muted-foreground py-12">
+              <TableCell colSpan={showActions ? 9 : 8} className="text-center text-muted-foreground py-12">
                 <div className="flex flex-col items-center gap-2">
                   <AlertCircle className="h-8 w-8 opacity-50" />
                   <p>{emptyMessage}</p>
@@ -197,6 +219,19 @@ export const ActivityTable = ({
                   </Select>
                 </TableCell>
                 <TableCell>
+                  <div className="flex items-center gap-2">
+                    <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full transition-all ${getProgressColor(activity.status)}`}
+                        style={{ width: `${getProgressFromStatus(activity.status)}%` }}
+                      />
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {getProgressFromStatus(activity.status)}%
+                    </span>
+                  </div>
+                </TableCell>
+                <TableCell>
                   {activity.department?.name ? (
                     <Badge variant="secondary" className="font-normal text-xs bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
                       {activity.department.name}
@@ -205,17 +240,11 @@ export const ActivityTable = ({
                     <span className="text-muted-foreground">—</span>
                   )}
                 </TableCell>
-                <TableCell>
-                  {activity.deadline && !isNaN(new Date(activity.deadline).getTime()) ? (
-                    (new Date(activity.deadline) >= new Date() || activity.status === 'concluida') ? (
-                      <div className="flex items-center gap-1 text-green-600">
-                        <CheckCircle2 className="h-4 w-4" />
-                        <span>Ok</span>
-                      </div>
-                    ) : (
-                      <span className="text-red-500 font-bold text-xs">! Atrasado</span>
-                    )
-                  ) : "—"}
+                <TableCell className="text-xs">
+                  {formatDate(activity.goal_date)}
+                </TableCell>
+                <TableCell className="text-xs">
+                  {formatDate(activity.deadline)}
                 </TableCell>
                 {showActions && (
                   <TableCell className="text-right">
