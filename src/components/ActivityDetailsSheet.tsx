@@ -41,6 +41,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
+import { createNotification } from "@/hooks/useNotifications";
 
 interface ChecklistItem {
     id: string;
@@ -292,6 +293,42 @@ export function ActivityDetailsSheet({
                 if (!isProject && initialActivity) {
                     if (initialActivity.status !== formData.status) {
                         await recordHistory(activityId!, 'alterou', 'status', initialActivity.status, formData.status);
+                        
+                        // Notificar assignees sobre mudança de status
+                        if (profile?.id) {
+                            const assigneesTable = isProject ? 'project_activity_assignees' : 'department_activity_assignees';
+                            const { data: assignees } = await supabase
+                                .from(assigneesTable)
+                                .select('user_id')
+                                .eq('activity_id', activityId!);
+                            
+                            if (assignees) {
+                                const statusLabels: Record<string, string> = {
+                                    'pendente': 'Não iniciado',
+                                    'em_andamento': 'Em andamento',
+                                    'concluida': 'Finalizado',
+                                    'cancelada': 'Cancelado'
+                                };
+                                
+                                for (const assignee of assignees) {
+                                    if (assignee.user_id !== profile.id) {
+                                        try {
+                                            await createNotification({
+                                                userId: assignee.user_id,
+                                                title: "Status da atividade alterado",
+                                                description: `"${formData.name}" mudou de ${statusLabels[initialActivity.status] || initialActivity.status} para ${statusLabels[formData.status] || formData.status}`,
+                                                type: "status_change",
+                                                activityId: activityId!,
+                                                departmentId: initialActivity.department_id,
+                                                createdBy: profile.id
+                                            });
+                                        } catch (e) {
+                                            console.error("Erro ao criar notificação:", e);
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                     if (initialActivity.priority !== formData.priority) {
                         await recordHistory(activityId!, 'alterou', 'prioridade', initialActivity.priority, formData.priority);
@@ -416,6 +453,36 @@ export function ActivityDetailsSheet({
 
         if (!error && data) {
             setComments([data, ...comments]);
+            
+            // Detectar menções (@usuario) e criar notificações
+            const mentionRegex = /@(\w+)/g;
+            const mentions = newComment.match(mentionRegex);
+            
+            if (mentions && profiles && profile?.id) {
+                for (const mention of mentions) {
+                    const mentionName = mention.slice(1).toLowerCase();
+                    const mentionedUser = profiles.find(p => 
+                        p.full_name.toLowerCase().includes(mentionName)
+                    );
+                    
+                    if (mentionedUser && mentionedUser.id !== profile.id) {
+                        try {
+                            await createNotification({
+                                userId: mentionedUser.id,
+                                title: "Você foi mencionado em um comentário",
+                                description: `${profile?.full_name || 'Alguém'} mencionou você: "${newComment.slice(0, 100)}${newComment.length > 100 ? '...' : ''}"`,
+                                type: "mention",
+                                activityId: initialActivity.id,
+                                departmentId: initialActivity.department_id,
+                                createdBy: profile.id
+                            });
+                        } catch (e) {
+                            console.error("Erro ao criar notificação:", e);
+                        }
+                    }
+                }
+            }
+            
             setNewComment("");
         }
     };
