@@ -1,13 +1,16 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { AlertCircle, FolderOpen, Building2 } from "lucide-react";
+import { AlertCircle, FolderOpen, Building2, RotateCcw } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
+import { useState } from "react";
 
 interface ProjectActivity {
     id: string;
@@ -39,6 +42,8 @@ interface DepartmentActivity {
 
 export const TaskHistoryTable = () => {
     const { selectedCompanyId } = useAuth();
+    const queryClient = useQueryClient();
+    const [restoringId, setRestoringId] = useState<string | null>(null);
 
     // Fetch completed project activities
     const { data: projectActivities = [], isLoading: isLoadingProjects } = useQuery({
@@ -90,6 +95,58 @@ export const TaskHistoryTable = () => {
         enabled: !!selectedCompanyId
     });
 
+    const handleRestoreProjectActivity = async (activityId: string, activityName: string) => {
+        setRestoringId(activityId);
+        try {
+            const { error } = await supabase
+                .from('project_activities')
+                .update({ 
+                    status: 'pendente', 
+                    completed_at: null,
+                    deadline_status: 'no_prazo'
+                })
+                .eq('id', activityId);
+
+            if (error) throw error;
+
+            toast.success(`Atividade "${activityName}" restaurada com sucesso!`);
+            queryClient.invalidateQueries({ queryKey: ['completed-project-activities'] });
+            queryClient.invalidateQueries({ queryKey: ['global-activities'] });
+            queryClient.invalidateQueries({ queryKey: ['tasks'] });
+        } catch (error) {
+            console.error('Erro ao restaurar atividade:', error);
+            toast.error('Erro ao restaurar atividade');
+        } finally {
+            setRestoringId(null);
+        }
+    };
+
+    const handleRestoreDepartmentActivity = async (activityId: string, activityName: string) => {
+        setRestoringId(activityId);
+        try {
+            const { error } = await supabase
+                .from('department_activities')
+                .update({ 
+                    status: 'pendente', 
+                    completed_at: null,
+                    deadline_status: 'no_prazo'
+                })
+                .eq('id', activityId);
+
+            if (error) throw error;
+
+            toast.success(`Atividade "${activityName}" restaurada com sucesso!`);
+            queryClient.invalidateQueries({ queryKey: ['completed-department-activities'] });
+            queryClient.invalidateQueries({ queryKey: ['global-activities'] });
+            queryClient.invalidateQueries({ queryKey: ['department-activities'] });
+        } catch (error) {
+            console.error('Erro ao restaurar atividade:', error);
+            toast.error('Erro ao restaurar atividade');
+        } finally {
+            setRestoringId(null);
+        }
+    };
+
     const getDeadlineStatusBadge = (status: string | null) => {
         switch (status) {
             case "bateu_meta":
@@ -131,6 +188,7 @@ export const TaskHistoryTable = () => {
                         <TableHead>Projeto</TableHead>
                         <TableHead>Status do Prazo</TableHead>
                         <TableHead>Concluído em</TableHead>
+                        <TableHead className="w-[100px]">Ações</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -163,6 +221,18 @@ export const TaskHistoryTable = () => {
                                     }
                                 </div>
                             </TableCell>
+                            <TableCell>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleRestoreProjectActivity(activity.id, activity.name)}
+                                    disabled={restoringId === activity.id}
+                                    className="h-8 px-2 text-muted-foreground hover:text-primary"
+                                    title="Restaurar atividade"
+                                >
+                                    <RotateCcw className={`h-4 w-4 ${restoringId === activity.id ? 'animate-spin' : ''}`} />
+                                </Button>
+                            </TableCell>
                         </TableRow>
                     ))}
                 </TableBody>
@@ -181,6 +251,7 @@ export const TaskHistoryTable = () => {
                         <TableHead>Departamento</TableHead>
                         <TableHead>Status do Prazo</TableHead>
                         <TableHead>Concluído em</TableHead>
+                        <TableHead className="w-[100px]">Ações</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -212,6 +283,18 @@ export const TaskHistoryTable = () => {
                                         : "-"
                                     }
                                 </div>
+                            </TableCell>
+                            <TableCell>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleRestoreDepartmentActivity(activity.id, activity.name)}
+                                    disabled={restoringId === activity.id}
+                                    className="h-8 px-2 text-muted-foreground hover:text-primary"
+                                    title="Restaurar atividade"
+                                >
+                                    <RotateCcw className={`h-4 w-4 ${restoringId === activity.id ? 'animate-spin' : ''}`} />
+                                </Button>
                             </TableCell>
                         </TableRow>
                     ))}
