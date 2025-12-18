@@ -13,6 +13,7 @@ import { Plus, AlertCircle, List, GitBranch } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { createNotification } from "@/hooks/useNotifications";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Database } from "@/integrations/supabase/types";
@@ -243,15 +244,35 @@ const Activities = () => {
   // Complete activity mutation
   const completeMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
+      const { data: updated, error } = await supabase
         .from('department_activities')
         .update({
           status: 'concluida' as ActivityStatus,
           completed_at: new Date().toISOString(),
         })
-        .eq('id', id);
+        .eq('id', id)
+        .select('id, name, department_id')
+        .single();
 
       if (error) throw error;
+
+      if (profile?.id) {
+        try {
+          await createNotification({
+            userId: profile.id,
+            title: 'Atividade concluída',
+            description: `Você concluiu "${updated.name}"`,
+            type: 'status_change',
+            activityId: updated.id,
+            departmentId: updated.department_id,
+            createdBy: profile.id,
+          });
+        } catch (e) {
+          console.error('Erro ao criar notificação de conclusão:', e);
+        }
+      }
+
+      return updated;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['department-activities'] });

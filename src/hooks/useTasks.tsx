@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
+import { createNotification } from '@/hooks/useNotifications';
 import { useToast } from '@/hooks/use-toast';
 import { Database } from '@/integrations/supabase/types';
 
@@ -205,10 +206,27 @@ export function useTasks(projectId?: string) {
                     completed_at: new Date().toISOString(),
                 })
                 .eq('id', id)
-                .select()
+                .select('id, name, project_id')
                 .single();
 
             if (error) throw error;
+
+            if (profile?.id) {
+                try {
+                    await createNotification({
+                        userId: profile.id,
+                        title: 'Atividade concluída',
+                        description: `Você concluiu "${data.name}"`,
+                        type: 'status_change',
+                        activityId: data.id,
+                        projectId: data.project_id,
+                        createdBy: profile.id,
+                    });
+                } catch (e) {
+                    console.error('Erro ao criar notificação de conclusão (projeto):', e);
+                }
+            }
+
             return data;
         },
         onSuccess: () => {
