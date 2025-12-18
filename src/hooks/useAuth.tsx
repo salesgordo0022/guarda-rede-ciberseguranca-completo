@@ -30,7 +30,7 @@ interface AuthContextType extends AuthState {
   isGestor: boolean;
   isColaborador: boolean;
   refetchProfile: (companyId?: string | null) => Promise<void>;
-  setSelectedCompanyId: (id: string | null) => void;
+  setSelectedCompanyId: (id: string | null) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -263,8 +263,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isGestor = authState.profile?.role === 'gestor';
   const isColaborador = authState.profile?.role === 'colaborador';
 
-  const setSelectedCompanyId = (id: string | null) => {
-    setAuthState(prev => ({ ...prev, selectedCompanyId: id }));
+  const setSelectedCompanyId = async (id: string | null) => {
+    if (!authState.user || id === authState.selectedCompanyId) return;
+    
+    setAuthState(prev => ({ ...prev, selectedCompanyId: id, companyLoading: true }));
+    
+    // Rebusca o perfil com a role da nova empresa
+    const { profile } = await fetchProfile(authState.user.id, id);
+    setAuthState(prev => ({
+      ...prev,
+      profile,
+      companyLoading: false,
+    }));
   };
 
   return (
