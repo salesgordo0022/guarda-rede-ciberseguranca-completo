@@ -1,15 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, AlertCircle, List, GitBranch } from "lucide-react";
+import { Plus, AlertCircle, List, GitBranch, Search } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -64,9 +58,9 @@ const Activities = () => {
   const { isAdmin, isGestor, selectedCompanyId, profile } = useAuth();
   const queryClient = useQueryClient();
 
-  const [open, setOpen] = useState(false);
   const [viewing, setViewing] = useState<any>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Fetch departments
   const { data: departments = [] } = useQuery({
@@ -85,43 +79,6 @@ const Activities = () => {
     enabled: !!selectedCompanyId
   });
 
-  // Fetch company users (profiles)
-  const { data: companyUsers = [] } = useQuery({
-    queryKey: ['company-users', selectedCompanyId],
-    queryFn: async () => {
-      if (!selectedCompanyId) return [];
-
-      // Primeiro busca os user_ids da empresa
-      const { data: userCompanies, error: ucError } = await supabase
-        .from('user_companies')
-        .select('user_id')
-        .eq('company_id', selectedCompanyId);
-
-      if (ucError) {
-        console.error('Erro ao buscar membros da empresa:', ucError);
-        return [];
-      }
-
-      if (!userCompanies || userCompanies.length === 0) return [];
-
-      const userIds = userCompanies.map(uc => uc.user_id);
-
-      // Depois busca os perfis desses usuários
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, full_name, avatar_url')
-        .in('id', userIds);
-
-      if (profilesError) {
-        console.error('Erro ao buscar perfis:', profilesError);
-        return [];
-      }
-
-      return profiles || [];
-    },
-    enabled: !!selectedCompanyId
-  });
-
   // Redirect to first department if none selected
   useEffect(() => {
     if (departments.length > 0 && !departmentFilterId) {
@@ -129,11 +86,9 @@ const Activities = () => {
     }
   }, [departments, departmentFilterId, navigate]);
 
-
-
-  // Fetch department activities (excluding completed ones) with assignees
-  const { data: activities = [], isLoading } = useQuery({
-    queryKey: ['department-activities', departmentFilterId, selectedCompanyId],
+  // Fetch ALL department activities (including completed for metrics)
+  const { data: allActivities = [], isLoading } = useQuery({
+    queryKey: ['department-activities-all', departmentFilterId, selectedCompanyId],
     queryFn: async (): Promise<DepartmentActivity[]> => {
       if (!departmentFilterId || !selectedCompanyId) return [];
 
@@ -144,7 +99,6 @@ const Activities = () => {
           department:departments(id, name, company_id)
         `)
         .eq('department_id', departmentFilterId)
-        .neq('status', 'concluida')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -200,7 +154,27 @@ const Activities = () => {
     enabled: !!departmentFilterId && !!selectedCompanyId
   });
 
+  // Calculate metrics from all activities
+  const metrics = useMemo(() => {
+    const total = allActivities.length;
+    const completed = allActivities.filter(a => a.status === "concluida").length;
+    const inProgress = allActivities.filter(a => a.status === "em_andamento").length;
+    const pending = allActivities.filter(a => a.status === "pendente").length;
+    const overdue = allActivities.filter(a => a.deadline_status === "fora_do_prazo").length;
+    const completionPercentage = total > 0 ? Math.round((completed / total) * 100) : 0;
 
+    return { total, completed, inProgress, pending, overdue, completionPercentage };
+  }, [allActivities]);
+
+  // Filter activities: exclude completed AND apply search
+  const filteredActivities = useMemo(() => {
+    return allActivities.filter(activity =>
+      activity.status !== 'concluida' && (
+        activity.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (activity.description && activity.description.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+    );
+  }, [allActivities, searchQuery]);
 
   // Update activity mutation
   const updateMutation = useMutation({
@@ -214,7 +188,7 @@ const Activities = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['department-activities'] });
+      queryClient.invalidateQueries({ queryKey: ['department-activities-all'] });
       toast.success('Atividade atualizada!');
     },
     onError: (error) => {
@@ -233,7 +207,7 @@ const Activities = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['department-activities'] });
+      queryClient.invalidateQueries({ queryKey: ['department-activities-all'] });
       toast.success('Atividade excluída!');
     },
     onError: (error) => {
@@ -273,7 +247,7 @@ const Activities = () => {
       return updated;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['department-activities'] });
+      queryClient.invalidateQueries({ queryKey: ['department-activities-all'] });
       toast.success('Atividade concluída!');
     },
     onError: (error) => {
@@ -286,7 +260,6 @@ const Activities = () => {
     deleteMutation.mutate(id);
   };
 
-
   const handleStatusChange = (id: string, status: ActivityStatus) => {
     updateMutation.mutate({ id, status });
   };
@@ -295,6 +268,11 @@ const Activities = () => {
     setViewing(activity);
   };
 
+  const getProgressColor = (percentage: number) => {
+    if (percentage >= 70) return "bg-green-500";
+    if (percentage >= 30) return "bg-yellow-500";
+    return "bg-red-500";
+  };
 
   const currentDepartmentName = departments.find(d => d.id === departmentFilterId)?.name;
 
@@ -312,6 +290,7 @@ const Activities = () => {
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6 animate-fade-in">
+      {/* Header */}
       <div className="flex flex-col gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">
@@ -321,16 +300,111 @@ const Activities = () => {
             Gerencie as atividades deste departamento
           </p>
         </div>
-
-        <Button
-          onClick={() => setIsCreating(true)}
-          className="bg-primary hover:bg-primary/90 text-white shadow-lg hover:shadow-xl transition-all w-full sm:w-auto"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Nova Atividade
-        </Button>
       </div>
 
+      {/* Metrics Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Total de Atividades</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{metrics.total}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Concluídas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{metrics.completed}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Em Andamento</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{metrics.inProgress}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Pendentes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-600">{metrics.pending}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Atrasadas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{metrics.overdue}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Progress Bar */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Progresso do Departamento</CardTitle>
+          <CardDescription>
+            {metrics.completionPercentage}% concluído
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <div className="w-full bg-muted rounded-full h-4">
+              <div
+                className={`h-4 rounded-full ${getProgressColor(metrics.completionPercentage)}`}
+                style={{ width: `${metrics.completionPercentage}%` }}
+              ></div>
+            </div>
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span>0%</span>
+              <span>100%</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Activities Section Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold">Atividades do Departamento</h2>
+          <p className="text-muted-foreground">
+            Gerencie as atividades deste departamento
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Buscar atividades..."
+              className="pl-9"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          {(isAdmin || isGestor) && (
+            <Button onClick={() => setIsCreating(true)} className="bg-primary hover:bg-primary/90">
+              <Plus className="h-4 w-4 mr-2" />
+              Nova Atividade
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Tabs */}
       <Tabs defaultValue="list" className="w-full">
         <TabsList className="mb-4">
           <TabsTrigger value="list" className="gap-2">
@@ -347,7 +421,7 @@ const Activities = () => {
           <Card className="border-none shadow-md bg-card/50 backdrop-blur-sm">
             <CardContent className="p-0">
               <ActivityTable
-                activities={activities}
+                activities={filteredActivities}
                 isLoading={isLoading}
                 onStatusChange={handleStatusChange}
                 onEdit={(isAdmin || isGestor) ? handleEdit : undefined}
@@ -367,7 +441,7 @@ const Activities = () => {
           <Card className="border-none shadow-md bg-card/50 backdrop-blur-sm">
             <CardContent className="p-6">
               <ProcessFlowDiagram 
-                activities={activities}
+                activities={filteredActivities}
                 onActivityClick={(activity) => setViewing(activity)}
               />
             </CardContent>
