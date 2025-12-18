@@ -301,6 +301,16 @@ export function AppSidebar() {
           <Rocket className="h-5 w-5 flex-shrink-0" />
           {open && <span className="text-[15px] font-medium">Produtivo</span>}
         </a>
+
+        <a 
+          href="https://appp.gclick.com.br/autenticacao" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="flex items-center gap-3 px-4 py-3 rounded-lg transition-all bg-sidebar-accent text-sidebar-foreground hover:bg-sidebar-accent/80 hover-scale w-full"
+        >
+          <Building2 className="h-5 w-5 flex-shrink-0" />
+          {open && <span className="text-[15px] font-medium">Gclick</span>}
+        </a>
       </SidebarFooter>
 
     </Sidebar >
