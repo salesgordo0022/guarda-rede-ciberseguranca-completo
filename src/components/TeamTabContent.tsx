@@ -34,13 +34,13 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { MultiSelect } from "@/components/ui/multi-select";
 
 interface TeamMember {
     id: string;
@@ -49,6 +49,7 @@ interface TeamMember {
     avatar_url: string | null;
     role: "admin" | "gestor" | "colaborador";
     departments: { id: string; name: string }[];
+    companies: { id: string; name: string }[];
 }
 
 const getRoleInfo = (role: string) => {
@@ -125,6 +126,7 @@ export const TeamTabContent = () => {
     const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
     const [selectedCompanies, setSelectedCompanies] = useState<string[]>([]);
     const [editDepartments, setEditDepartments] = useState<string[]>([]);
+    const [editCompanies, setEditCompanies] = useState<string[]>([]);
     const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
 
     // Form para criar
@@ -188,6 +190,7 @@ export const TeamTabContent = () => {
                 password: "",
             });
             setEditDepartments(editingMember.departments.map(d => d.id));
+            setEditCompanies(editingMember.companies.map(c => c.id));
         }
     }, [editingMember, editForm]);
 
@@ -245,10 +248,23 @@ export const TeamTabContent = () => {
 
             if (deptsError) throw deptsError;
 
-            // Combinar dados - agora com múltiplos departamentos
+            // Buscar empresas dos usuários
+            const { data: userComps, error: compsError } = await supabase
+                .from("user_companies")
+                .select(`
+                    user_id,
+                    company_id,
+                    company:companies(id, name)
+                `)
+                .in("user_id", userIds);
+
+            if (compsError) throw compsError;
+
+            // Combinar dados - agora com múltiplos departamentos e empresas
             const members: TeamMember[] = (profiles || []).map(profile => {
                 const companyUser = companyUsers.find(u => u.user_id === profile.id);
                 const userDepartments = userDepts?.filter(d => d.user_id === profile.id) || [];
+                const userCompanies = userComps?.filter(c => c.user_id === profile.id) || [];
                 
                 return {
                     id: profile.id,
@@ -258,6 +274,9 @@ export const TeamTabContent = () => {
                     role: (companyUser?.role as "admin" | "gestor" | "colaborador") || "colaborador",
                     departments: userDepartments
                         .map(d => d.department as { id: string; name: string })
+                        .filter(Boolean),
+                    companies: userCompanies
+                        .map(c => c.company as { id: string; name: string })
                         .filter(Boolean),
                 };
             });
@@ -332,6 +351,7 @@ export const TeamTabContent = () => {
                     fullName: values.fullName,
                     password: values.password || undefined,
                     departmentIds: editDepartments,
+                    companyIds: editCompanies,
                 },
             });
 
@@ -355,6 +375,7 @@ export const TeamTabContent = () => {
             setEditingMember(null);
             editForm.reset();
             setEditDepartments([]);
+            setEditCompanies([]);
         },
         onError: (error: any) => {
             toast({
@@ -371,38 +392,6 @@ export const TeamTabContent = () => {
 
     const onEditSubmit = (values: z.infer<typeof editUserSchema>) => {
         updateUserMutation.mutate(values);
-    };
-
-    const handleCompanyToggle = (companyId: string) => {
-        setSelectedCompanies(prev => {
-            const newSelection = prev.includes(companyId) 
-                ? prev.filter(id => id !== companyId)
-                : [...prev, companyId];
-            
-            // Limpar departamentos que não pertencem às empresas selecionadas
-            if (!newSelection.includes(companyId)) {
-                const deptsToRemove = allDepartments?.filter(d => d.company_id === companyId).map(d => d.id) || [];
-                setSelectedDepartments(prevDepts => prevDepts.filter(id => !deptsToRemove.includes(id)));
-            }
-            
-            return newSelection;
-        });
-    };
-
-    const handleDepartmentToggle = (deptId: string) => {
-        setSelectedDepartments(prev => 
-            prev.includes(deptId) 
-                ? prev.filter(id => id !== deptId)
-                : [...prev, deptId]
-        );
-    };
-
-    const handleEditDepartmentToggle = (deptId: string) => {
-        setEditDepartments(prev => 
-            prev.includes(deptId) 
-                ? prev.filter(id => id !== deptId)
-                : [...prev, deptId]
-        );
     };
 
     const openEditDialog = (member: TeamMember) => {
@@ -542,28 +531,13 @@ export const TeamTabContent = () => {
                                     <FormDescription>
                                         Selecione uma ou mais empresas para o usuário
                                     </FormDescription>
-                                    <div className="grid grid-cols-1 gap-2 mt-2 max-h-32 overflow-y-auto border rounded-md p-3">
-                                        {companies?.map((company) => (
-                                            <div key={company.id} className="flex items-center space-x-2">
-                                                <Checkbox
-                                                    id={`company-${company.id}`}
-                                                    checked={selectedCompanies.includes(company.id)}
-                                                    onCheckedChange={() => handleCompanyToggle(company.id)}
-                                                />
-                                                <label
-                                                    htmlFor={`company-${company.id}`}
-                                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                                                >
-                                                    {company.name}
-                                                </label>
-                                            </div>
-                                        ))}
-                                        {(!companies || companies.length === 0) && (
-                                            <p className="text-sm text-muted-foreground">
-                                                Nenhuma empresa cadastrada
-                                            </p>
-                                        )}
-                                    </div>
+                                    <MultiSelect
+                                        options={companies?.map(c => ({ value: c.id, label: c.name })) || []}
+                                        selected={selectedCompanies}
+                                        onChange={setSelectedCompanies}
+                                        placeholder="Selecione as empresas..."
+                                        emptyMessage="Nenhuma empresa cadastrada"
+                                    />
                                 </FormItem>
 
                                 {selectedCompanies.length > 0 && (
@@ -572,28 +546,17 @@ export const TeamTabContent = () => {
                                         <FormDescription>
                                             Selecione um ou mais departamentos para o usuário
                                         </FormDescription>
-                                        <div className="grid grid-cols-1 gap-2 mt-2 max-h-40 overflow-y-auto border rounded-md p-3">
-                                            {allDepartments?.map((dept) => (
-                                                <div key={dept.id} className="flex items-center space-x-2">
-                                                    <Checkbox
-                                                        id={`dept-${dept.id}`}
-                                                        checked={selectedDepartments.includes(dept.id)}
-                                                        onCheckedChange={() => handleDepartmentToggle(dept.id)}
-                                                    />
-                                                    <label
-                                                        htmlFor={`dept-${dept.id}`}
-                                                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                                                    >
-                                                        {dept.name} <span className="text-xs text-muted-foreground">({(dept.companies as any)?.name})</span>
-                                                    </label>
-                                                </div>
-                                            ))}
-                                            {(!allDepartments || allDepartments.length === 0) && (
-                                                <p className="text-sm text-muted-foreground">
-                                                    Nenhum departamento nas empresas selecionadas
-                                                </p>
-                                            )}
-                                        </div>
+                                        <MultiSelect
+                                            options={allDepartments?.map(d => ({ 
+                                                value: d.id, 
+                                                label: d.name,
+                                                description: (d.companies as any)?.name
+                                            })) || []}
+                                            selected={selectedDepartments}
+                                            onChange={setSelectedDepartments}
+                                            placeholder="Selecione os departamentos..."
+                                            emptyMessage="Nenhum departamento nas empresas selecionadas"
+                                        />
                                     </FormItem>
                                 )}
 
@@ -794,6 +757,7 @@ export const TeamTabContent = () => {
                 if (!open) {
                     setEditingMember(null);
                     setEditDepartments([]);
+                    setEditCompanies([]);
                 }
             }}>
                 <DialogContent className="sm:max-w-[500px]">
@@ -821,32 +785,31 @@ export const TeamTabContent = () => {
                             />
 
                             <FormItem>
+                                <FormLabel>Empresas</FormLabel>
+                                <FormDescription>
+                                    Selecione uma ou mais empresas
+                                </FormDescription>
+                                <MultiSelect
+                                    options={companies?.map(c => ({ value: c.id, label: c.name })) || []}
+                                    selected={editCompanies}
+                                    onChange={setEditCompanies}
+                                    placeholder="Selecione as empresas..."
+                                    emptyMessage="Nenhuma empresa cadastrada"
+                                />
+                            </FormItem>
+
+                            <FormItem>
                                 <FormLabel>Departamentos</FormLabel>
                                 <FormDescription>
                                     Selecione um ou mais departamentos
                                 </FormDescription>
-                                <div className="grid grid-cols-2 gap-2 mt-2 max-h-40 overflow-y-auto border rounded-md p-3">
-                                    {departments?.map((dept) => (
-                                        <div key={dept.id} className="flex items-center space-x-2">
-                                            <Checkbox
-                                                id={`edit-dept-${dept.id}`}
-                                                checked={editDepartments.includes(dept.id)}
-                                                onCheckedChange={() => handleEditDepartmentToggle(dept.id)}
-                                            />
-                                            <label
-                                                htmlFor={`edit-dept-${dept.id}`}
-                                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                                            >
-                                                {dept.name}
-                                            </label>
-                                        </div>
-                                    ))}
-                                    {(!departments || departments.length === 0) && (
-                                        <p className="text-sm text-muted-foreground col-span-2">
-                                            Nenhum departamento cadastrado
-                                        </p>
-                                    )}
-                                </div>
+                                <MultiSelect
+                                    options={departments?.map(d => ({ value: d.id, label: d.name })) || []}
+                                    selected={editDepartments}
+                                    onChange={setEditDepartments}
+                                    placeholder="Selecione os departamentos..."
+                                    emptyMessage="Nenhum departamento cadastrado"
+                                />
                             </FormItem>
 
                             <FormField
@@ -919,6 +882,7 @@ export const TeamTabContent = () => {
                                         setEditDialogOpen(false);
                                         setEditingMember(null);
                                         setEditDepartments([]);
+                                        setEditCompanies([]);
                                     }}
                                 >
                                     Cancelar
