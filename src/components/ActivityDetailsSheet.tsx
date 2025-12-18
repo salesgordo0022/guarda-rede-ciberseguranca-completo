@@ -578,7 +578,7 @@ export function ActivityDetailsSheet({
                         </div>
 
                         {/* Checklist Section */}
-                        {initialActivity?.id && isDepartmentActivity && (
+                        {isDepartmentActivity && (
                             <>
                                 <Separator />
                                 <div className="space-y-4">
@@ -586,66 +586,74 @@ export function ActivityDetailsSheet({
                                         <ListChecks className="h-4 w-4" />
                                         Checklist - Passos da Atividade
                                     </div>
-                                    <div className="flex gap-2">
-                                        <Input
-                                            value={newChecklistItem}
-                                            onChange={(e) => setNewChecklistItem(e.target.value)}
-                                            placeholder="Adicionar novo passo..."
-                                            onKeyDown={(e) => e.key === 'Enter' && addChecklistItem()}
-                                        />
-                                        <Button onClick={addChecklistItem} size="icon" variant="outline">
-                                            <Plus className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                    <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                                        {checklist.length === 0 ? (
-                                            <p className="text-sm text-muted-foreground text-center py-4">
-                                                Nenhum passo adicionado
-                                            </p>
-                                        ) : (
-                                            checklist.map((item) => (
-                                                <div key={item.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 group">
-                                                    <Checkbox
-                                                        checked={item.completed}
-                                                        onCheckedChange={() => toggleChecklistItem(item)}
-                                                    />
-                                                    <span className={`flex-1 text-sm ${item.completed ? 'line-through text-muted-foreground' : ''}`}>
-                                                        {item.title}
-                                                    </span>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-8 w-8 opacity-0 group-hover:opacity-100"
-                                                        onClick={() => deleteChecklistItem(item.id)}
-                                                    >
-                                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                                    </Button>
-                                                </div>
-                                            ))
-                                        )}
-                                    </div>
-                                    {checklist.length > 0 && (
-                                        <div className="pt-2">
-                                            <div className="flex items-center justify-between text-sm mb-1">
-                                                <span className="text-muted-foreground">Progresso do Checklist</span>
-                                                <span className="font-medium">
-                                                    {Math.round((checklist.filter(c => c.completed).length / checklist.length) * 100)}%
-                                                </span>
-                                            </div>
-                                            <div className="h-2 bg-muted rounded-full overflow-hidden">
-                                                <div 
-                                                    className="h-full bg-primary transition-all"
-                                                    style={{ width: `${(checklist.filter(c => c.completed).length / checklist.length) * 100}%` }}
+                                    {!initialActivity?.id ? (
+                                        <p className="text-sm text-muted-foreground text-center py-4 bg-muted/30 rounded-lg">
+                                            Salve a atividade primeiro para adicionar itens ao checklist
+                                        </p>
+                                    ) : (
+                                        <>
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    value={newChecklistItem}
+                                                    onChange={(e) => setNewChecklistItem(e.target.value)}
+                                                    placeholder="Adicionar novo passo..."
+                                                    onKeyDown={(e) => e.key === 'Enter' && addChecklistItem()}
                                                 />
+                                                <Button onClick={addChecklistItem} size="icon" variant="outline">
+                                                    <Plus className="h-4 w-4" />
+                                                </Button>
                                             </div>
-                                        </div>
+                                            <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                                                {checklist.length === 0 ? (
+                                                    <p className="text-sm text-muted-foreground text-center py-4">
+                                                        Nenhum passo adicionado
+                                                    </p>
+                                                ) : (
+                                                    checklist.map((item) => (
+                                                        <div key={item.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 group">
+                                                            <Checkbox
+                                                                checked={item.completed}
+                                                                onCheckedChange={() => toggleChecklistItem(item)}
+                                                            />
+                                                            <span className={`flex-1 text-sm ${item.completed ? 'line-through text-muted-foreground' : ''}`}>
+                                                                {item.title}
+                                                            </span>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-8 w-8 opacity-0 group-hover:opacity-100"
+                                                                onClick={() => deleteChecklistItem(item.id)}
+                                                            >
+                                                                <Trash2 className="h-4 w-4 text-destructive" />
+                                                            </Button>
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+                                            {checklist.length > 0 && (
+                                                <div className="pt-2">
+                                                    <div className="flex items-center justify-between text-sm mb-1">
+                                                        <span className="text-muted-foreground">Progresso do Checklist</span>
+                                                        <span className="font-medium">
+                                                            {Math.round((checklist.filter(c => c.completed).length / checklist.length) * 100)}%
+                                                        </span>
+                                                    </div>
+                                                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                                        <div 
+                                                            className="h-full bg-primary transition-all"
+                                                            style={{ width: `${(checklist.filter(c => c.completed).length / checklist.length) * 100}%` }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </>
                                     )}
                                 </div>
                             </>
                         )}
 
                         {/* Comments Section */}
-                        {initialActivity?.id && isDepartmentActivity && (
+                        {isDepartmentActivity && (
                             <>
                                 <Separator />
                                 <div className="space-y-4">
@@ -653,47 +661,55 @@ export function ActivityDetailsSheet({
                                         <MessageSquare className="h-4 w-4" />
                                         Comentários
                                     </div>
-                                    <div className="flex gap-2">
-                                        <Input
-                                            value={newComment}
-                                            onChange={(e) => setNewComment(e.target.value)}
-                                            placeholder="Adicionar comentário..."
-                                            onKeyDown={(e) => e.key === 'Enter' && addComment()}
-                                        />
-                                        <Button onClick={addComment} size="icon" variant="outline">
-                                            <Send className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                    <div className="space-y-3 max-h-[200px] overflow-y-auto">
-                                        {comments.length === 0 ? (
-                                            <p className="text-sm text-muted-foreground text-center py-4">
-                                                Nenhum comentário ainda
-                                            </p>
-                                        ) : (
-                                            comments.map((comment) => (
-                                                <div key={comment.id} className="p-3 rounded-lg bg-muted/30 space-y-2">
-                                                    <div className="flex items-center gap-2">
-                                                        <Avatar className="h-6 w-6">
-                                                            <AvatarFallback className="text-xs bg-primary/10">
-                                                                {getUserName(comment.user_id).charAt(0).toUpperCase()}
-                                                            </AvatarFallback>
-                                                        </Avatar>
-                                                        <span className="text-sm font-medium">{getUserName(comment.user_id)}</span>
-                                                        <span className="text-xs text-muted-foreground">
-                                                            {format(new Date(comment.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                                                        </span>
-                                                    </div>
-                                                    <p className="text-sm pl-8">{comment.content}</p>
-                                                </div>
-                                            ))
-                                        )}
-                                    </div>
+                                    {!initialActivity?.id ? (
+                                        <p className="text-sm text-muted-foreground text-center py-4 bg-muted/30 rounded-lg">
+                                            Salve a atividade primeiro para adicionar comentários
+                                        </p>
+                                    ) : (
+                                        <>
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    value={newComment}
+                                                    onChange={(e) => setNewComment(e.target.value)}
+                                                    placeholder="Adicionar comentário..."
+                                                    onKeyDown={(e) => e.key === 'Enter' && addComment()}
+                                                />
+                                                <Button onClick={addComment} size="icon" variant="outline">
+                                                    <Send className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                            <div className="space-y-3 max-h-[200px] overflow-y-auto">
+                                                {comments.length === 0 ? (
+                                                    <p className="text-sm text-muted-foreground text-center py-4">
+                                                        Nenhum comentário ainda
+                                                    </p>
+                                                ) : (
+                                                    comments.map((comment) => (
+                                                        <div key={comment.id} className="p-3 rounded-lg bg-muted/30 space-y-2">
+                                                            <div className="flex items-center gap-2">
+                                                                <Avatar className="h-6 w-6">
+                                                                    <AvatarFallback className="text-xs bg-primary/10">
+                                                                        {getUserName(comment.user_id).charAt(0).toUpperCase()}
+                                                                    </AvatarFallback>
+                                                                </Avatar>
+                                                                <span className="text-sm font-medium">{getUserName(comment.user_id)}</span>
+                                                                <span className="text-xs text-muted-foreground">
+                                                                    {format(new Date(comment.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                                                                </span>
+                                                            </div>
+                                                            <p className="text-sm pl-8">{comment.content}</p>
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             </>
                         )}
 
                         {/* Diário de Bordo Section */}
-                        {initialActivity?.id && isDepartmentActivity && (
+                        {isDepartmentActivity && (
                             <>
                                 <Separator />
                                 <div className="space-y-4">
@@ -701,42 +717,50 @@ export function ActivityDetailsSheet({
                                         <BookOpen className="h-4 w-4" />
                                         Diário de Bordo
                                     </div>
-                                    <div className="space-y-2">
-                                        <Textarea
-                                            value={newNote}
-                                            onChange={(e) => setNewNote(e.target.value)}
-                                            placeholder="Escreva o que quiser sobre esta atividade..."
-                                            className="min-h-[100px] resize-none"
-                                        />
-                                        <Button onClick={addNote} size="sm" variant="outline" className="gap-2">
-                                            <Plus className="h-4 w-4" />
-                                            Adicionar ao Diário
-                                        </Button>
-                                    </div>
-                                    <div className="space-y-3 max-h-[300px] overflow-y-auto">
-                                        {notes.map((note) => (
-                                            <div key={note.id} className="p-3 rounded-lg border bg-card space-y-2">
-                                                <div className="flex items-center gap-2">
-                                                    <Avatar className="h-6 w-6">
-                                                        <AvatarFallback className="text-xs bg-primary/10">
-                                                            {getUserName(note.user_id).charAt(0).toUpperCase()}
-                                                        </AvatarFallback>
-                                                    </Avatar>
-                                                    <span className="text-sm font-medium">{getUserName(note.user_id)}</span>
-                                                    <span className="text-xs text-muted-foreground">
-                                                        {format(new Date(note.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                                                    </span>
-                                                </div>
-                                                <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                                    {!initialActivity?.id ? (
+                                        <p className="text-sm text-muted-foreground text-center py-4 bg-muted/30 rounded-lg">
+                                            Salve a atividade primeiro para adicionar ao diário
+                                        </p>
+                                    ) : (
+                                        <>
+                                            <div className="space-y-2">
+                                                <Textarea
+                                                    value={newNote}
+                                                    onChange={(e) => setNewNote(e.target.value)}
+                                                    placeholder="Escreva o que quiser sobre esta atividade..."
+                                                    className="min-h-[100px] resize-none"
+                                                />
+                                                <Button onClick={addNote} size="sm" variant="outline" className="gap-2">
+                                                    <Plus className="h-4 w-4" />
+                                                    Adicionar ao Diário
+                                                </Button>
                                             </div>
-                                        ))}
-                                    </div>
+                                            <div className="space-y-3 max-h-[300px] overflow-y-auto">
+                                                {notes.map((note) => (
+                                                    <div key={note.id} className="p-3 rounded-lg border bg-card space-y-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <Avatar className="h-6 w-6">
+                                                                <AvatarFallback className="text-xs bg-primary/10">
+                                                                    {getUserName(note.user_id).charAt(0).toUpperCase()}
+                                                                </AvatarFallback>
+                                                            </Avatar>
+                                                            <span className="text-sm font-medium">{getUserName(note.user_id)}</span>
+                                                            <span className="text-xs text-muted-foreground">
+                                                                {format(new Date(note.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             </>
                         )}
 
                         {/* History Section */}
-                        {initialActivity?.id && isDepartmentActivity && (
+                        {isDepartmentActivity && (
                             <>
                                 <Separator />
                                 <div className="space-y-4">
@@ -744,73 +768,75 @@ export function ActivityDetailsSheet({
                                         <History className="h-4 w-4" />
                                         Histórico de Alterações
                                     </div>
-                                    <div className="space-y-3 max-h-[200px] overflow-y-auto">
-                                        {history.length === 0 ? (
-                                            <p className="text-sm text-muted-foreground text-center py-4">
-                                                Nenhum histórico de alterações
-                                            </p>
-                                        ) : (
-                                            history.map((entry) => (
-                                                <div key={entry.id} className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/30">
-                                                    <Avatar className="h-6 w-6 mt-0.5">
-                                                        <AvatarFallback className="text-xs bg-primary/10">
-                                                            {getUserName(entry.user_id).charAt(0).toUpperCase()}
-                                                        </AvatarFallback>
-                                                    </Avatar>
-                                                    <div className="flex-1">
-                                                        <p className="text-sm">
-                                                            <span className="font-medium">{getUserName(entry.user_id)}</span>
-                                                            {' '}{entry.action}{' '}
-                                                            {entry.field_name && (
-                                                                <span className="text-muted-foreground">
-                                                                    {entry.field_name}
-                                                                    {entry.old_value && entry.new_value && (
-                                                                        <>
-                                                                            {' '}de <span className="line-through">{entry.old_value}</span>
-                                                                            {' '}para <span className="font-medium">{entry.new_value}</span>
-                                                                        </>
-                                                                    )}
-                                                                </span>
-                                                            )}
-                                                        </p>
-                                                        <span className="text-xs text-muted-foreground">
-                                                            {format(new Date(entry.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                                                        </span>
+                                    {!initialActivity?.id ? (
+                                        <p className="text-sm text-muted-foreground text-center py-4 bg-muted/30 rounded-lg">
+                                            O histórico será exibido após salvar a atividade
+                                        </p>
+                                    ) : (
+                                        <div className="space-y-3 max-h-[200px] overflow-y-auto">
+                                            {history.length === 0 ? (
+                                                <p className="text-sm text-muted-foreground text-center py-4">
+                                                    Nenhum histórico de alterações
+                                                </p>
+                                            ) : (
+                                                history.map((entry) => (
+                                                    <div key={entry.id} className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/30">
+                                                        <Avatar className="h-6 w-6 mt-0.5">
+                                                            <AvatarFallback className="text-xs bg-primary/10">
+                                                                {getUserName(entry.user_id).charAt(0).toUpperCase()}
+                                                            </AvatarFallback>
+                                                        </Avatar>
+                                                        <div className="flex-1">
+                                                            <p className="text-sm">
+                                                                <span className="font-medium">{getUserName(entry.user_id)}</span>
+                                                                {' '}{entry.action}{' '}
+                                                                {entry.field_name && (
+                                                                    <span className="text-muted-foreground">
+                                                                        {entry.field_name}
+                                                                        {entry.old_value && entry.new_value && (
+                                                                            <>
+                                                                                {' '}de <span className="line-through">{entry.old_value}</span>
+                                                                                {' '}para <span className="font-medium">{entry.new_value}</span>
+                                                                            </>
+                                                                        )}
+                                                                    </span>
+                                                                )}
+                                                            </p>
+                                                            <span className="text-xs text-muted-foreground">
+                                                                {format(new Date(entry.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                                                            </span>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            ))
-                                        )}
-                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             </>
                         )}
 
                         {/* Progress Section based on Status */}
-                        {mode === 'view' && (
-                            <>
-                                <Separator />
-                                <div className="space-y-3">
-                                    <div className="flex items-center justify-between text-sm">
-                                        <span className="text-muted-foreground font-medium">Progresso da Atividade</span>
-                                        <span className="font-medium">{getProgressFromStatus(formData.status)}%</span>
-                                    </div>
-                                    <div className="h-3 bg-muted rounded-full overflow-hidden">
-                                        <div 
-                                            className={`h-full transition-all ${
-                                                formData.status === 'concluida' ? 'bg-green-500' :
-                                                formData.status === 'em_andamento' ? 'bg-blue-500' :
-                                                formData.status === 'cancelada' ? 'bg-red-500' :
-                                                'bg-muted-foreground/30'
-                                            }`}
-                                            style={{ width: `${getProgressFromStatus(formData.status)}%` }}
-                                        />
-                                    </div>
-                                    <p className="text-xs text-muted-foreground">
-                                        Status: {getStatusLabel(formData.status)}
-                                    </p>
-                                </div>
-                            </>
-                        )}
+                        <Separator />
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground font-medium">Progresso da Atividade</span>
+                                <span className="font-medium">{getProgressFromStatus(formData.status)}%</span>
+                            </div>
+                            <div className="h-3 bg-muted rounded-full overflow-hidden">
+                                <div 
+                                    className={`h-full transition-all ${
+                                        formData.status === 'concluida' ? 'bg-green-500' :
+                                        formData.status === 'em_andamento' ? 'bg-blue-500' :
+                                        formData.status === 'cancelada' ? 'bg-red-500' :
+                                        'bg-muted-foreground/30'
+                                    }`}
+                                    style={{ width: `${getProgressFromStatus(formData.status)}%` }}
+                                />
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                Status: {getStatusLabel(formData.status)}
+                            </p>
+                        </div>
                     </div>
                 </ScrollArea>
             </SheetContent>
