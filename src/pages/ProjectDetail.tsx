@@ -1,18 +1,15 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Plus, Search, ArrowLeft, User } from "lucide-react";
+import { Plus, Search, ArrowLeft, User, Users, Check } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ActivityTable } from "@/components/ActivityTable";
 import { ActivityDetailsSheet } from "@/components/ActivityDetailsSheet";
@@ -54,12 +51,11 @@ const ProjectDetail = () => {
   const navigate = useNavigate();
   const { profile, isAdmin, isGestor, selectedCompanyId } = useAuth();
   const queryClient = useQueryClient();
-  const [selectedActivity, setSelectedActivity] = useState<any>(null); // For editing
-  const [viewingActivity, setViewingActivity] = useState<any>(null); // For detailed view
-  const [isEditProjectOpen, setIsEditProjectOpen] = useState(false);
+  const [selectedActivity, setSelectedActivity] = useState<any>(null);
+  const [viewingActivity, setViewingActivity] = useState<any>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-
+  const [activeTab, setActiveTab] = useState("activities");
   // Fetch project
   const { data: project, isLoading: isProjectLoading, error: projectError } = useQuery({
     queryKey: ["project", projectId],
@@ -115,6 +111,66 @@ const ProjectDetail = () => {
     enabled: !!selectedCompanyId
   });
 
+  // Fetch project members
+  const { data: projectMembers = [] } = useQuery({
+    queryKey: ['project-members', projectId],
+    queryFn: async () => {
+      if (!projectId) return [];
+      
+      const { data, error } = await supabase
+        .from('project_members')
+        .select('user_id')
+        .eq('project_id', projectId);
+      
+      if (error) {
+        console.error('Erro ao buscar membros do projeto:', error);
+        return [];
+      }
+      
+      return data.map(m => m.user_id);
+    },
+    enabled: !!projectId
+  });
+
+  // Mutation to toggle project member
+  const toggleMemberMutation = useMutation({
+    mutationFn: async ({ userId, isAdding }: { userId: string; isAdding: boolean }) => {
+      if (isAdding) {
+        const { error } = await supabase
+          .from('project_members')
+          .insert({ project_id: projectId!, user_id: userId });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('project_members')
+          .delete()
+          .eq('project_id', projectId!)
+          .eq('user_id', userId);
+        if (error) throw error;
+      }
+    },
+    onSuccess: (_, { isAdding }) => {
+      queryClient.invalidateQueries({ queryKey: ['project-members', projectId] });
+      toast.success(isAdding ? 'Membro adicionado ao projeto!' : 'Membro removido do projeto!');
+    },
+    onError: (error) => {
+      toast.error('Erro ao atualizar membros: ' + (error as Error).message);
+    }
+  });
+
+  const handleToggleMember = (userId: string) => {
+    const isCurrentlyMember = projectMembers.includes(userId);
+    toggleMemberMutation.mutate({ userId, isAdding: !isCurrentlyMember });
+  };
+
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
   // Helper function to get user name by ID
   const getUserNameById = (userId: string) => {
     const user = companyUsers.find(u => u.id === userId);
@@ -373,54 +429,121 @@ const ProjectDetail = () => {
         </CardContent>
       </Card>
 
-      {/* Activities Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold">Atividades do Projeto</h2>
-          <p className="text-muted-foreground">
-            Gerencie as atividades deste projeto
-          </p>
-        </div>
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="activities" className="flex items-center gap-2">
+            <Search className="h-4 w-4" />
+            Atividades
+          </TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger value="team" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Equipe ({projectMembers.length})
+            </TabsTrigger>
+          )}
+        </TabsList>
 
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Buscar atividades..."
-              className="pl-9"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+        <TabsContent value="activities" className="space-y-4">
+          {/* Activities Section */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-bold">Atividades do Projeto</h2>
+              <p className="text-muted-foreground">
+                Gerencie as atividades deste projeto
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Buscar atividades..."
+                  className="pl-9"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+
+              {(isAdmin || isGestor) && (
+                <Button onClick={() => setIsCreating(true)} className="bg-primary hover:bg-primary/90">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nova Atividade
+                </Button>
+              )}
+            </div>
           </div>
 
-          {(isAdmin || isGestor) && (
-            <Button onClick={() => setIsCreating(true)} className="bg-primary hover:bg-primary/90">
-              <Plus className="h-4 w-4 mr-2" />
-              Nova Atividade
-            </Button>
-          )}
-        </div>
-      </div>
+          {/* Activities Table */}
+          <Card>
+            <CardContent className="p-0">
+              <ActivityTable
+                activities={filteredActivities}
+                isLoading={isActivitiesLoading}
+                onStatusChange={handleStatusChange}
+                onEdit={(isAdmin || isGestor) ? (activity) => setViewingActivity(activity) : undefined}
+                onDelete={(isAdmin || isGestor) ? handleDeleteActivity : undefined}
+                onComplete={(id) => handleStatusChange(id, 'concluida')}
+                showActions={true}
+                emptyMessage="Nenhuma atividade encontrada"
+                currentUserId={profile?.id}
+                isAdmin={isAdmin}
+                onView={(activity) => setViewingActivity(activity)}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-      {/* Activities Table */}
-      <Card>
-        <CardContent className="p-0">
-          <ActivityTable
-            activities={filteredActivities}
-            isLoading={isActivitiesLoading}
-            onStatusChange={handleStatusChange}
-            onEdit={(isAdmin || isGestor) ? (activity) => setViewingActivity(activity) : undefined}
-            onDelete={(isAdmin || isGestor) ? handleDeleteActivity : undefined}
-            onComplete={(id) => handleStatusChange(id, 'concluida')}
-            showActions={true}
-            emptyMessage="Nenhuma atividade encontrada"
-            currentUserId={profile?.id}
-            isAdmin={isAdmin}
-            onView={(activity) => setViewingActivity(activity)}
-          />
-        </CardContent>
-      </Card>
+        {isAdmin && (
+          <TabsContent value="team" className="space-y-4">
+            <div>
+              <h2 className="text-2xl font-bold">Equipe do Projeto</h2>
+              <p className="text-muted-foreground">
+                Selecione quais membros podem ver as atividades deste projeto
+              </p>
+            </div>
+
+            <Card>
+              <CardContent className="p-4">
+                {companyUsers.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    Nenhum membro encontrado na empresa
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {companyUsers.map((user) => {
+                      const isMember = projectMembers.includes(user.id);
+                      return (
+                        <div
+                          key={user.id}
+                          className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
+                            isMember ? 'bg-primary/10 border-primary' : 'hover:bg-muted'
+                          }`}
+                          onClick={() => handleToggleMember(user.id)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-10 w-10">
+                              <AvatarImage src={user.avatar_url || undefined} />
+                              <AvatarFallback>{getInitials(user.full_name)}</AvatarFallback>
+                            </Avatar>
+                            <span className="font-medium">{user.full_name}</span>
+                          </div>
+                          <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                            isMember ? 'bg-primary border-primary' : 'border-muted-foreground'
+                          }`}>
+                            {isMember && <Check className="h-4 w-4 text-primary-foreground" />}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+      </Tabs>
 
       <ActivityDetailsSheet
         activity={viewingActivity}
