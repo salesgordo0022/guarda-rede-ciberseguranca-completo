@@ -650,11 +650,64 @@ export type Database = {
         }
         Relationships: []
       }
+      user_scores: {
+        Row: {
+          beat_goal_count: number
+          company_id: string
+          created_at: string
+          current_score: number
+          id: string
+          on_time_count: number
+          total_cycles_completed: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          beat_goal_count?: number
+          company_id: string
+          created_at?: string
+          current_score?: number
+          id?: string
+          on_time_count?: number
+          total_cycles_completed?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          beat_goal_count?: number
+          company_id?: string
+          created_at?: string
+          current_score?: number
+          id?: string
+          on_time_count?: number
+          total_cycles_completed?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_scores_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      add_user_score: {
+        Args: {
+          _company_id: string
+          _is_beat_goal?: boolean
+          _points: number
+          _user_id: string
+        }
+        Returns: undefined
+      }
       get_project_indicators_for_user: {
         Args: never
         Returns: {
@@ -681,6 +734,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      reset_user_score: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: undefined
       }
       user_belongs_to_company: {
         Args: { _company_id: string; _user_id: string }
