@@ -222,6 +222,10 @@ export function ActivityDetailsSheet({
 
         const isProject = !initialActivity.department_id;
         const assigneesTable = isProject ? 'project_activity_assignees' : 'department_activity_assignees';
+        const checklistTable = isProject ? 'project_activity_checklist' : 'department_activity_checklist';
+        const commentsTable = isProject ? 'project_activity_comments' : 'department_activity_comments';
+        const historyTable = isProject ? 'project_activity_history' : 'department_activity_history';
+        const notesTable = isProject ? 'project_activity_notes' : 'department_activity_notes';
 
         // Fetch assignees
         const { data: assigneesData } = await supabase
@@ -232,36 +236,34 @@ export function ActivityDetailsSheet({
             setSelectedAssignees(assigneesData.map(a => a.user_id));
         }
 
-        // Only fetch these for department activities
-        if (!isProject) {
-            const { data: checklistData } = await supabase
-                .from('department_activity_checklist')
-                .select('*')
-                .eq('activity_id', initialActivity.id)
-                .order('order_index');
-            if (checklistData) setChecklist(checklistData);
+        // Fetch checklist, comments, history, notes for both project and department activities
+        const { data: checklistData } = await supabase
+            .from(checklistTable)
+            .select('*')
+            .eq('activity_id', initialActivity.id)
+            .order('order_index');
+        if (checklistData) setChecklist(checklistData);
 
-            const { data: commentsData } = await supabase
-                .from('department_activity_comments')
-                .select('*')
-                .eq('activity_id', initialActivity.id)
-                .order('created_at', { ascending: false });
-            if (commentsData) setComments(commentsData);
+        const { data: commentsData } = await supabase
+            .from(commentsTable)
+            .select('*')
+            .eq('activity_id', initialActivity.id)
+            .order('created_at', { ascending: false });
+        if (commentsData) setComments(commentsData);
 
-            const { data: historyData } = await supabase
-                .from('department_activity_history')
-                .select('*')
-                .eq('activity_id', initialActivity.id)
-                .order('created_at', { ascending: false });
-            if (historyData) setHistory(historyData);
+        const { data: historyData } = await supabase
+            .from(historyTable)
+            .select('*')
+            .eq('activity_id', initialActivity.id)
+            .order('created_at', { ascending: false });
+        if (historyData) setHistory(historyData);
 
-            const { data: notesData } = await supabase
-                .from('department_activity_notes')
-                .select('*')
-                .eq('activity_id', initialActivity.id)
-                .order('created_at', { ascending: false });
-            if (notesData) setNotes(notesData);
-        }
+        const { data: notesData } = await supabase
+            .from(notesTable)
+            .select('*')
+            .eq('activity_id', initialActivity.id)
+            .order('created_at', { ascending: false });
+        if (notesData) setNotes(notesData);
     };
 
     // Initialize/Reset Form
@@ -305,8 +307,9 @@ export function ActivityDetailsSheet({
         );
     };
 
-    const recordHistory = async (activityId: string, action: string, fieldName?: string, oldValue?: string, newValue?: string) => {
-        await supabase.from('department_activity_history').insert({
+    const recordHistory = async (activityId: string, action: string, fieldName?: string, oldValue?: string, newValue?: string, isProject?: boolean) => {
+        const historyTable = isProject ? 'project_activity_history' : 'department_activity_history';
+        await supabase.from(historyTable).insert({
             activity_id: activityId,
             user_id: profile?.id,
             action,
@@ -324,7 +327,7 @@ export function ActivityDetailsSheet({
 
         setLoading(true);
         try {
-            const isProject = preselectedProjectId || (initialActivity && !initialActivity.department_id);
+            const isProject = !!(preselectedProjectId || (initialActivity && !initialActivity.department_id));
             const table = isProject ? 'project_activities' : 'department_activities';
 
             const activityData: any = {
@@ -341,7 +344,6 @@ export function ActivityDetailsSheet({
             if (mode === 'create') {
                 if (isProject) {
                     activityData.project_id = preselectedProjectId;
-                    delete activityData.priority;
                 } else {
                     activityData.department_id = formData.department_id || preselectedDepartmentId;
                 }
@@ -356,21 +358,23 @@ export function ActivityDetailsSheet({
                 if (error) throw error;
                 activityId = data.id;
 
-                if (!isProject) {
-                    await recordHistory(activityId, 'criou', undefined, undefined, 'Atividade criada');
-                    
-                    // Salvar checklist items criados localmente
-                    if (checklist.length > 0) {
-                        const checklistItems = checklist.map((item, index) => ({
-                            activity_id: activityId,
-                            title: item.title,
-                            completed: item.completed,
-                            order_index: index
-                        }));
-                        await supabase.from('department_activity_checklist').insert(checklistItems);
-                    }
+                const checklistTable = isProject ? 'project_activity_checklist' : 'department_activity_checklist';
+                
+                await recordHistory(activityId, 'criou', undefined, undefined, 'Atividade criada', isProject);
+                
+                // Salvar checklist items criados localmente
+                if (checklist.length > 0) {
+                    const checklistItems = checklist.map((item, index) => ({
+                        activity_id: activityId,
+                        title: item.title,
+                        completed: item.completed,
+                        order_index: index
+                    }));
+                    await supabase.from(checklistTable).insert(checklistItems);
+                }
 
-                    // Notificar todos da empresa sobre nova atividade
+                if (!isProject) {
+                    // Notificar todos da empresa sobre nova atividade de departamento
                     if (selectedCompanyId && profile?.id) {
                         const departmentId = formData.department_id || preselectedDepartmentId;
                         const { data: deptData } = await supabase
@@ -422,12 +426,13 @@ export function ActivityDetailsSheet({
 
                 toast.success("Atividade criada com sucesso!");
             } else {
-                if (!isProject && initialActivity) {
+                // Record history for both project and department activities
+                if (initialActivity) {
                     if (initialActivity.status !== formData.status) {
-                        await recordHistory(activityId!, 'alterou', 'status', initialActivity.status, formData.status);
+                        await recordHistory(activityId!, 'alterou', 'status', initialActivity.status, formData.status, isProject);
                         
                         // Notificar todos da empresa sobre mudança de status
-                        if (profile?.id && selectedCompanyId) {
+                        if (profile?.id && selectedCompanyId && !isProject) {
                             await notifyActivityStatusChanged(
                                 selectedCompanyId,
                                 formData.name,
@@ -441,20 +446,17 @@ export function ActivityDetailsSheet({
                         }
                     }
                     if (initialActivity.priority !== formData.priority) {
-                        await recordHistory(activityId!, 'alterou', 'prioridade', initialActivity.priority, formData.priority);
+                        await recordHistory(activityId!, 'alterou', 'prioridade', initialActivity.priority, formData.priority, isProject);
                     }
                     if (initialActivity.name !== formData.name) {
-                        await recordHistory(activityId!, 'alterou', 'nome', initialActivity.name, formData.name);
+                        await recordHistory(activityId!, 'alterou', 'nome', initialActivity.name, formData.name, isProject);
                     }
                 }
 
-                const updateData = isProject 
-                    ? { name: formData.name, status: formData.status, description: formData.description, goal_date: formData.goal_date || null, deadline: formData.deadline || null }
-                    : activityData;
-
+                // Both project and department activities use the same data structure now
                 const { data: updatedActivity, error } = await supabase
                     .from(table)
-                    .update(updateData)
+                    .update(activityData)
                     .eq('id', activityId)
                     .select()
                     .single();
@@ -510,6 +512,7 @@ export function ActivityDetailsSheet({
             }
 
             queryClient.invalidateQueries({ queryKey: ['department-activities'] });
+            queryClient.invalidateQueries({ queryKey: ['department-activities-all'] });
             queryClient.invalidateQueries({ queryKey: ['project-activities'] });
             queryClient.invalidateQueries({ queryKey: ['global-activities'] });
             queryClient.invalidateQueries({ queryKey: ['gamification-report'] });
@@ -532,10 +535,13 @@ export function ActivityDetailsSheet({
     const addChecklistItem = async () => {
         if (!newChecklistItem.trim()) return;
         
+        const isProject = initialActivity && !initialActivity.department_id;
+        const checklistTable = isProject ? 'project_activity_checklist' : 'department_activity_checklist';
+        
         // Se já existe a atividade, salva no banco
         if (initialActivity?.id) {
             const { data, error } = await supabase
-                .from('department_activity_checklist')
+                .from(checklistTable)
                 .insert({
                     activity_id: initialActivity.id,
                     title: newChecklistItem,
@@ -547,7 +553,7 @@ export function ActivityDetailsSheet({
             if (!error && data) {
                 setChecklist([...checklist, data]);
                 setNewChecklistItem("");
-                await recordHistory(initialActivity.id, 'adicionou', 'checklist', undefined, newChecklistItem);
+                await recordHistory(initialActivity.id, 'adicionou', 'checklist', undefined, newChecklistItem, !!isProject);
             }
         } else {
             // Se não existe, adiciona localmente (será salvo ao criar a atividade)
@@ -569,8 +575,11 @@ export function ActivityDetailsSheet({
             return;
         }
 
+        const isProject = initialActivity && !initialActivity.department_id;
+        const checklistTable = isProject ? 'project_activity_checklist' : 'department_activity_checklist';
+
         const { error } = await supabase
-            .from('department_activity_checklist')
+            .from(checklistTable)
             .update({ completed: !item.completed })
             .eq('id', item.id);
 
@@ -586,8 +595,11 @@ export function ActivityDetailsSheet({
             return;
         }
 
+        const isProject = initialActivity && !initialActivity.department_id;
+        const checklistTable = isProject ? 'project_activity_checklist' : 'department_activity_checklist';
+
         const { error } = await supabase
-            .from('department_activity_checklist')
+            .from(checklistTable)
             .delete()
             .eq('id', itemId);
 
@@ -600,8 +612,11 @@ export function ActivityDetailsSheet({
     const addComment = async () => {
         if (!newComment.trim() || !initialActivity?.id) return;
 
+        const isProject = !initialActivity.department_id;
+        const commentsTable = isProject ? 'project_activity_comments' : 'department_activity_comments';
+
         const { data, error } = await supabase
-            .from('department_activity_comments')
+            .from(commentsTable)
             .insert({
                 activity_id: initialActivity.id,
                 user_id: profile?.id,
@@ -634,8 +649,11 @@ export function ActivityDetailsSheet({
     const addNote = async () => {
         if (!newNote.trim() || !initialActivity?.id) return;
 
+        const isProject = !initialActivity.department_id;
+        const notesTable = isProject ? 'project_activity_notes' : 'department_activity_notes';
+
         const { data, error } = await supabase
-            .from('department_activity_notes')
+            .from(notesTable)
             .insert({
                 activity_id: initialActivity.id,
                 user_id: profile?.id,
@@ -749,26 +767,24 @@ export function ActivityDetailsSheet({
                                 </Select>
                             </InputWrapper>
 
-                            {isDepartmentActivity && (
-                                <InputWrapper icon={Flag} label="Prioridade">
-                                    <Select value={formData.priority} onValueChange={(val) => handleChange('priority', val)}>
-                                        <SelectTrigger className={`w-[180px] ${getPriorityColor(formData.priority)}`}>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="urgente">
-                                                <span className="text-red-500 font-medium">Urgente</span>
-                                            </SelectItem>
-                                            <SelectItem value="nao_urgente">
-                                                <span className="text-green-500 font-medium">Não Urgente</span>
-                                            </SelectItem>
-                                            <SelectItem value="media">
-                                                <span className="text-yellow-500 font-medium">Média Urgência</span>
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </InputWrapper>
-                            )}
+                            <InputWrapper icon={Flag} label="Prioridade">
+                                <Select value={formData.priority} onValueChange={(val) => handleChange('priority', val)}>
+                                    <SelectTrigger className={`w-[180px] ${getPriorityColor(formData.priority)}`}>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="urgente">
+                                            <span className="text-red-500 font-medium">Urgente</span>
+                                        </SelectItem>
+                                        <SelectItem value="nao_urgente">
+                                            <span className="text-green-500 font-medium">Não Urgente</span>
+                                        </SelectItem>
+                                        <SelectItem value="media">
+                                            <span className="text-yellow-500 font-medium">Média Urgência</span>
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </InputWrapper>
 
                             <InputWrapper icon={User} label="Criado por">
                                 <div className="flex items-center gap-2">
@@ -939,9 +955,8 @@ export function ActivityDetailsSheet({
                         </div>
 
                         {/* Checklist Section */}
-                        {isDepartmentActivity && (
-                            <>
-                                <Separator />
+                        <>
+                            <Separator />
                                 <div className="space-y-4">
                                     <div className="flex items-center gap-2 text-muted-foreground font-medium">
                                         <ListChecks className="h-4 w-4" />
@@ -1003,120 +1018,115 @@ export function ActivityDetailsSheet({
                                     )}
                                 </div>
                             </>
-                        )}
 
                         {/* Comments Section */}
-                        {isDepartmentActivity && (
-                            <>
-                                <Separator />
-                                <div className="space-y-4">
-                                    <div className="flex items-center gap-2 text-muted-foreground font-medium">
-                                        <MessageSquare className="h-4 w-4" />
-                                        Comentários
-                                    </div>
-                                    {!initialActivity?.id ? (
-                                        <p className="text-sm text-muted-foreground text-center py-4 bg-muted/30 rounded-lg">
-                                            Salve a atividade primeiro para adicionar comentários
-                                        </p>
-                                    ) : (
-                                        <>
-                                            <div className="flex gap-2">
-                                                <Input
-                                                    value={newComment}
-                                                    onChange={(e) => setNewComment(e.target.value)}
-                                                    placeholder="Adicionar comentário..."
-                                                    onKeyDown={(e) => e.key === 'Enter' && addComment()}
-                                                />
-                                                <Button onClick={addComment} size="icon" variant="outline">
-                                                    <Send className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                            <div className="space-y-3 max-h-[200px] overflow-y-auto">
-                                                {comments.length === 0 ? (
-                                                    <p className="text-sm text-muted-foreground text-center py-4">
-                                                        Nenhum comentário ainda
-                                                    </p>
-                                                ) : (
-                                                    comments.map((comment) => (
-                                                        <div key={comment.id} className="p-3 rounded-lg bg-muted/30 space-y-2">
-                                                            <div className="flex items-center gap-2">
-                                                                <Avatar className="h-6 w-6">
-                                                                    <AvatarFallback className="text-xs bg-primary/10">
-                                                                        {getUserName(comment.user_id).charAt(0).toUpperCase()}
-                                                                    </AvatarFallback>
-                                                                </Avatar>
-                                                                <span className="text-sm font-medium">{getUserName(comment.user_id)}</span>
-                                                                <span className="text-xs text-muted-foreground">
-                                                                    {format(new Date(comment.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                                                                </span>
-                                                            </div>
-                                                            <p className="text-sm pl-8">{comment.content}</p>
-                                                        </div>
-                                                    ))
-                                                )}
-                                            </div>
-                                        </>
-                                    )}
+                        <>
+                            <Separator />
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-2 text-muted-foreground font-medium">
+                                    <MessageSquare className="h-4 w-4" />
+                                    Comentários
                                 </div>
-                            </>
-                        )}
-
-
-                        {/* History Section */}
-                        {isDepartmentActivity && (
-                            <>
-                                <Separator />
-                                <div className="space-y-4">
-                                    <div className="flex items-center gap-2 text-muted-foreground font-medium">
-                                        <History className="h-4 w-4" />
-                                        Histórico de Alterações
-                                    </div>
-                                    {!initialActivity?.id ? (
-                                        <p className="text-sm text-muted-foreground text-center py-4 bg-muted/30 rounded-lg">
-                                            O histórico será exibido após salvar a atividade
-                                        </p>
-                                    ) : (
+                                {!initialActivity?.id ? (
+                                    <p className="text-sm text-muted-foreground text-center py-4 bg-muted/30 rounded-lg">
+                                        Salve a atividade primeiro para adicionar comentários
+                                    </p>
+                                ) : (
+                                    <>
+                                        <div className="flex gap-2">
+                                            <Input
+                                                value={newComment}
+                                                onChange={(e) => setNewComment(e.target.value)}
+                                                placeholder="Adicionar comentário..."
+                                                onKeyDown={(e) => e.key === 'Enter' && addComment()}
+                                            />
+                                            <Button onClick={addComment} size="icon" variant="outline">
+                                                <Send className="h-4 w-4" />
+                                            </Button>
+                                        </div>
                                         <div className="space-y-3 max-h-[200px] overflow-y-auto">
-                                            {history.length === 0 ? (
+                                            {comments.length === 0 ? (
                                                 <p className="text-sm text-muted-foreground text-center py-4">
-                                                    Nenhum histórico de alterações
+                                                    Nenhum comentário ainda
                                                 </p>
                                             ) : (
-                                                history.map((entry) => (
-                                                    <div key={entry.id} className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/30">
-                                                        <Avatar className="h-6 w-6 mt-0.5">
-                                                            <AvatarFallback className="text-xs bg-primary/10">
-                                                                {getUserName(entry.user_id).charAt(0).toUpperCase()}
-                                                            </AvatarFallback>
-                                                        </Avatar>
-                                                        <div className="flex-1">
-                                                            <p className="text-sm">
-                                                                <span className="font-medium">{getUserName(entry.user_id)}</span>
-                                                                {' '}{entry.action}{' '}
-                                                                {entry.field_name && (
-                                                                    <span className="text-muted-foreground">
-                                                                        {entry.field_name}
-                                                                        {entry.old_value && entry.new_value && (
-                                                                            <>
-                                                                                {' '}de <span className="line-through">{entry.old_value}</span>
-                                                                                {' '}para <span className="font-medium">{entry.new_value}</span>
-                                                                            </>
-                                                                        )}
-                                                                    </span>
-                                                                )}
-                                                            </p>
+                                                comments.map((comment) => (
+                                                    <div key={comment.id} className="p-3 rounded-lg bg-muted/30 space-y-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <Avatar className="h-6 w-6">
+                                                                <AvatarFallback className="text-xs bg-primary/10">
+                                                                    {getUserName(comment.user_id).charAt(0).toUpperCase()}
+                                                                </AvatarFallback>
+                                                            </Avatar>
+                                                            <span className="text-sm font-medium">{getUserName(comment.user_id)}</span>
                                                             <span className="text-xs text-muted-foreground">
-                                                                {format(new Date(entry.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                                                                {format(new Date(comment.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
                                                             </span>
                                                         </div>
+                                                        <p className="text-sm pl-8">{comment.content}</p>
                                                     </div>
                                                 ))
                                             )}
                                         </div>
-                                    )}
+                                    </>
+                                )}
+                            </div>
+                        </>
+
+
+                        {/* History Section */}
+                        <>
+                            <Separator />
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-2 text-muted-foreground font-medium">
+                                    <History className="h-4 w-4" />
+                                    Histórico de Alterações
                                 </div>
-                            </>
-                        )}
+                                {!initialActivity?.id ? (
+                                    <p className="text-sm text-muted-foreground text-center py-4 bg-muted/30 rounded-lg">
+                                        O histórico será exibido após salvar a atividade
+                                    </p>
+                                ) : (
+                                    <div className="space-y-3 max-h-[200px] overflow-y-auto">
+                                        {history.length === 0 ? (
+                                            <p className="text-sm text-muted-foreground text-center py-4">
+                                                Nenhum histórico de alterações
+                                            </p>
+                                        ) : (
+                                            history.map((entry) => (
+                                                <div key={entry.id} className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/30">
+                                                    <Avatar className="h-6 w-6 mt-0.5">
+                                                        <AvatarFallback className="text-xs bg-primary/10">
+                                                            {getUserName(entry.user_id).charAt(0).toUpperCase()}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                    <div className="flex-1">
+                                                        <p className="text-sm">
+                                                            <span className="font-medium">{getUserName(entry.user_id)}</span>
+                                                            {' '}{entry.action}{' '}
+                                                            {entry.field_name && (
+                                                                <span className="text-muted-foreground">
+                                                                    {entry.field_name}
+                                                                    {entry.old_value && entry.new_value && (
+                                                                        <>
+                                                                            {' '}de <span className="line-through">{entry.old_value}</span>
+                                                                            {' '}para <span className="font-medium">{entry.new_value}</span>
+                                                                        </>
+                                                                    )}
+                                                                </span>
+                                                            )}
+                                                        </p>
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {format(new Date(entry.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </>
 
                     </div>
                 </ScrollArea>

@@ -414,6 +414,7 @@ export type Database = {
           kanban_column: string | null
           name: string
           order_index: number | null
+          priority: string | null
           project_id: string
           scheduled_date: string | null
           status: Database["public"]["Enums"]["activity_status"] | null
@@ -433,6 +434,7 @@ export type Database = {
           kanban_column?: string | null
           name: string
           order_index?: number | null
+          priority?: string | null
           project_id: string
           scheduled_date?: string | null
           status?: Database["public"]["Enums"]["activity_status"] | null
@@ -452,6 +454,7 @@ export type Database = {
           kanban_column?: string | null
           name?: string
           order_index?: number | null
+          priority?: string | null
           project_id?: string
           scheduled_date?: string | null
           status?: Database["public"]["Enums"]["activity_status"] | null
@@ -502,6 +505,155 @@ export type Database = {
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_activity_checklist: {
+        Row: {
+          activity_id: string
+          completed: boolean | null
+          created_at: string
+          id: string
+          order_index: number | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          activity_id: string
+          completed?: boolean | null
+          created_at?: string
+          id?: string
+          order_index?: number | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          activity_id?: string
+          completed?: boolean | null
+          created_at?: string
+          id?: string
+          order_index?: number | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_activity_checklist_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "project_activities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_activity_comments: {
+        Row: {
+          activity_id: string
+          content: string
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          activity_id: string
+          content: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          activity_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_activity_comments_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "project_activities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_activity_history: {
+        Row: {
+          action: string
+          activity_id: string
+          created_at: string
+          field_name: string | null
+          id: string
+          new_value: string | null
+          old_value: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          activity_id: string
+          created_at?: string
+          field_name?: string | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          activity_id?: string
+          created_at?: string
+          field_name?: string | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_activity_history_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "project_activities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_activity_notes: {
+        Row: {
+          activity_id: string
+          content: string
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          activity_id: string
+          content: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          activity_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_activity_notes_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "project_activities"
             referencedColumns: ["id"]
           },
         ]
