@@ -86,16 +86,44 @@ const ThemeApplicator = () => {
 // Verifica se o usuário está autenticado antes de permitir acesso à rota
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   // Hook para acessar o estado de autenticação do usuário
-  const { session, loading } = useAuth();
+  const { session, loading, companyLoading, selectedCompanyId } = useAuth();
 
   // Mostrar tela de carregamento enquanto verifica autenticação
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Carregando...</div>;
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
+        <div className="relative">
+          <div className="h-16 w-16 rounded-full border-4 border-primary/20 animate-pulse" />
+          <div className="absolute inset-0 h-16 w-16 rounded-full border-4 border-transparent border-t-primary animate-spin" />
+        </div>
+        <p className="text-muted-foreground animate-pulse">Carregando...</p>
+      </div>
+    );
   }
 
   // Redirecionar para página de autenticação se não estiver logado
   if (!session) {
     return <Navigate to="/auth" replace />;
+  }
+
+  // Mostrar carregamento enquanto busca empresa
+  if (companyLoading || (!selectedCompanyId && session)) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
+        <div className="relative">
+          <div className="h-16 w-16 rounded-full border-4 border-primary/20" />
+          <div className="absolute inset-0 h-16 w-16 rounded-full border-4 border-transparent border-t-primary animate-spin" />
+        </div>
+        <div className="flex flex-col items-center gap-2">
+          <p className="text-muted-foreground">Carregando empresa...</p>
+          <div className="flex gap-1">
+            <span className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
+            <span className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
+            <span className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // Renderizar os filhos se estiver autenticado

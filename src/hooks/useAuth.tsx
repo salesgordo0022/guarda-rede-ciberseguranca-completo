@@ -20,6 +20,7 @@ export interface AuthState {
   profile: UserProfile | null;
   session: Session | null;
   loading: boolean;
+  companyLoading: boolean;
   selectedCompanyId: string | null;
 }
 
@@ -40,10 +41,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     profile: null,
     session: null,
     loading: true,
+    companyLoading: true,
     selectedCompanyId: null,
   });
 
-  const fetchProfile = async (userId: string): Promise<UserProfile | null> => {
+  const fetchProfile = async (userId: string): Promise<{ profile: UserProfile | null; companyId: string | null }> => {
     try {
       // Busca perfil básico
       const { data: profileData, error: profileError } = await supabase
@@ -54,11 +56,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (profileError) {
         console.error('Error fetching profile:', profileError);
-        return null;
+        return { profile: null, companyId: null };
       }
 
       if (!profileData) {
-        return null;
+        return { profile: null, companyId: null };
       }
 
       // Busca role do usuário
@@ -68,12 +70,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .eq('user_id', userId)
         .maybeSingle();
 
-      // Busca empresa do usuário
-      const { data: companyData } = await supabase
+      // Busca TODAS as empresas do usuário e seleciona a primeira
+      const { data: companiesData } = await supabase
         .from('user_companies')
         .select('company_id')
         .eq('user_id', userId)
-        .maybeSingle();
+        .order('created_at', { ascending: true })
+        .limit(1);
+
+      const firstCompanyId = companiesData && companiesData.length > 0 
+        ? companiesData[0].company_id 
+        : null;
 
       // Busca departamento do usuário
       const { data: departmentData } = await supabase
@@ -88,16 +95,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: profileData.email,
         avatar_url: profileData.avatar_url,
         department_id: departmentData?.department_id || null,
-        company_id: companyData?.company_id || null,
+        company_id: firstCompanyId,
         role: (roleData?.role as 'admin' | 'gestor' | 'colaborador') || 'colaborador',
         created_at: profileData.created_at,
         updated_at: profileData.updated_at,
       };
 
-      return userProfile;
+      return { profile: userProfile, companyId: firstCompanyId };
     } catch (error) {
       console.error('Unexpected error fetching profile:', error);
-      return null;
+      return { profile: null, companyId: null };
     }
   };
 
@@ -117,11 +124,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             
             // Busca perfil de forma assíncrona
             setTimeout(async () => {
-              const profile = await fetchProfile(session.user.id);
+              const { profile, companyId } = await fetchProfile(session.user.id);
               setAuthState(prev => ({
                 ...prev,
                 profile,
-                selectedCompanyId: profile?.company_id || null,
+                selectedCompanyId: companyId,
+                companyLoading: false,
               }));
             }, 0);
           } else {
@@ -130,6 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               profile: null,
               session: null,
               loading: false,
+              companyLoading: false,
               selectedCompanyId: null,
             });
           }
@@ -140,22 +149,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data: { session } } = await supabase.auth.getSession();
 
       if (session?.user) {
-        const profile = await fetchProfile(session.user.id);
+        const { profile, companyId } = await fetchProfile(session.user.id);
         setAuthState({
           user: session.user,
           session,
           profile,
           loading: false,
-          selectedCompanyId: profile?.company_id || null,
+          companyLoading: false,
+          selectedCompanyId: companyId,
         });
       } else {
-        setAuthState(prev => ({ ...prev, loading: false }));
+        setAuthState(prev => ({ ...prev, loading: false, companyLoading: false }));
       }
 
       return () => subscription.unsubscribe();
     } catch (error) {
       console.error('Error initializing auth:', error);
-      setAuthState(prev => ({ ...prev, loading: false }));
+      setAuthState(prev => ({ ...prev, loading: false, companyLoading: false }));
     }
   };
 
@@ -171,6 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profile: null,
         session: null,
         loading: false,
+        companyLoading: false,
         selectedCompanyId: null,
       });
       toast.success('Logout realizado com sucesso');
@@ -197,11 +208,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isColaborador,
       refetchProfile: async () => {
         if (authState.user) {
-          const profile = await fetchProfile(authState.user.id);
+          setAuthState(prev => ({ ...prev, companyLoading: true }));
+          const { profile, companyId } = await fetchProfile(authState.user.id);
           setAuthState(prev => ({
             ...prev,
             profile,
-            selectedCompanyId: profile?.company_id || prev.selectedCompanyId
+            selectedCompanyId: companyId || prev.selectedCompanyId,
+            companyLoading: false,
           }));
         }
       },
