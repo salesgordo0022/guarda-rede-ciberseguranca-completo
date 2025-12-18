@@ -51,49 +51,55 @@ export function CreateProjectDialog({ open: controlledOpen, onOpenChange: setCon
     const [loading, setLoading] = useState(false);
 
     // Fetch team members from the company
-    const { data: teamMembers = [] } = useQuery({
+    const {
+        data: teamMembers = [],
+        isLoading: teamMembersLoading,
+        error: teamMembersError,
+    } = useQuery({
         queryKey: ['team-members-for-project', selectedCompanyId, profile?.id],
         queryFn: async () => {
             if (!selectedCompanyId) return [];
-            
-            // Get all users from the company
+
             const { data: companyUsers, error: companyError } = await supabase
                 .from('user_companies')
                 .select('user_id, role')
                 .eq('company_id', selectedCompanyId);
-            
+
             if (companyError) throw companyError;
             if (!companyUsers || companyUsers.length === 0) return [];
-            
-            const userIds = companyUsers.map(u => u.user_id);
-            
-            // Get profiles
+
+            const userIds = companyUsers.map((u) => u.user_id);
+
             const { data: profiles, error: profilesError } = await supabase
                 .from('profiles')
                 .select('id, full_name, email, avatar_url')
                 .in('id', userIds);
-            
+
             if (profilesError) throw profilesError;
-            
-            // Combine data - mostrar todos exceto o próprio usuário criador
+
             return (profiles || [])
-                .map(userProfile => {
-                    const companyUser = companyUsers.find(u => u.user_id === userProfile.id);
+                .map((userProfile) => {
+                    const companyUser = companyUsers.find((u) => u.user_id === userProfile.id);
                     return {
                         ...userProfile,
-                        role: companyUser?.role || 'colaborador'
+                        role: companyUser?.role || 'colaborador',
                     } as TeamMember;
                 })
-                .filter(member => member.id !== profile?.id);
+                .filter((member) => member.id !== profile?.id);
         },
-        enabled: !!selectedCompanyId && !!profile?.id && open
+        enabled: !!selectedCompanyId && !!profile?.id && open,
     });
 
+    const handleSetMember = (memberId: string, checked: boolean) => {
+        setSelectedMembers((prev) => {
+            if (checked) return prev.includes(memberId) ? prev : [...prev, memberId];
+            return prev.filter((id) => id !== memberId);
+        });
+    };
+
     const handleToggleMember = (memberId: string) => {
-        setSelectedMembers(prev => 
-            prev.includes(memberId) 
-                ? prev.filter(id => id !== memberId)
-                : [...prev, memberId]
+        setSelectedMembers((prev) =>
+            prev.includes(memberId) ? prev.filter((id) => id !== memberId) : [...prev, memberId]
         );
     };
 
@@ -238,7 +244,15 @@ export function CreateProjectDialog({ open: controlledOpen, onOpenChange: setCon
                             Selecione quem terá acesso a este projeto (obrigatório). Administradores sempre têm acesso.
                         </p>
                         <ScrollArea className="h-[200px] border rounded-lg p-3">
-                            {teamMembers.length === 0 ? (
+                            {teamMembersLoading ? (
+                                <p className="text-sm text-muted-foreground text-center py-4">
+                                    Carregando membros...
+                                </p>
+                            ) : teamMembersError ? (
+                                <p className="text-sm text-muted-foreground text-center py-4">
+                                    Não foi possível carregar os membros.
+                                </p>
+                            ) : teamMembers.length === 0 ? (
                                 <p className="text-sm text-muted-foreground text-center py-4">
                                     Nenhum membro disponível para selecionar
                                 </p>
@@ -254,10 +268,14 @@ export function CreateProjectDialog({ open: controlledOpen, onOpenChange: setCon
                                             }`}
                                             onClick={() => handleToggleMember(member.id)}
                                         >
-                                            <Checkbox
-                                                checked={selectedMembers.includes(member.id)}
-                                                onCheckedChange={() => handleToggleMember(member.id)}
-                                            />
+                                            <div onClick={(e) => e.stopPropagation()}>
+                                                <Checkbox
+                                                    checked={selectedMembers.includes(member.id)}
+                                                    onCheckedChange={(checked) =>
+                                                        handleSetMember(member.id, checked === true)
+                                                    }
+                                                />
+                                            </div>
                                             <Avatar className="h-8 w-8">
                                                 <AvatarImage src={member.avatar_url || undefined} />
                                                 <AvatarFallback className="text-xs">
