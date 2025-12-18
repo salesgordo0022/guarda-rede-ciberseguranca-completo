@@ -86,6 +86,22 @@ export function useNotifications() {
     },
   });
 
+  const deleteAllNotifications = useMutation({
+    mutationFn: async () => {
+      if (!user?.id) return;
+      
+      const { error } = await supabase
+        .from("notifications")
+        .delete()
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
+
   // Subscribe to realtime updates
   useEffect(() => {
     if (!user?.id) return;
@@ -118,6 +134,7 @@ export function useNotifications() {
     markAsRead,
     markAllAsRead,
     deleteNotification,
+    deleteAllNotifications,
   };
 }
 

@@ -107,7 +107,8 @@ export function NotificationBell() {
     isLoading, 
     markAsRead, 
     markAllAsRead, 
-    deleteNotification 
+    deleteNotification,
+    deleteAllNotifications
   } = useNotifications();
 
   if (!profile) return null;
@@ -133,19 +134,34 @@ export function NotificationBell() {
         align="end"
         sideOffset={10}
       >
-        <div className="p-4 border-b flex items-center justify-between">
-          <h3 className="font-semibold">Notificações</h3>
-          {unreadCount > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 text-xs"
-              onClick={() => markAllAsRead.mutate()}
-            >
-              <CheckCheck className="h-3.5 w-3.5 mr-1" />
-              Marcar todas como lidas
-            </Button>
-          )}
+        <div className="p-4 border-b">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold">Notificações</h3>
+            <div className="flex items-center gap-1">
+              {unreadCount > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => markAllAsRead.mutate()}
+                >
+                  <CheckCheck className="h-3.5 w-3.5 mr-1" />
+                  Marcar lidas
+                </Button>
+              )}
+              {notifications.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 text-xs text-destructive hover:text-destructive"
+                  onClick={() => deleteAllNotifications.mutate()}
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-1" />
+                  Limpar todas
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
         
         <ScrollArea className="h-80">
