@@ -9,7 +9,6 @@ import { Database } from "@/integrations/supabase/types";
 
 type ActivityStatus = Database['public']['Enums']['activity_status'];
 type DeadlineStatus = Database['public']['Enums']['deadline_status'];
-type Priority = 'urgente' | 'media_urgencia' | 'nao_urgente';
 
 interface Assignee {
   user_id: string;
@@ -25,10 +24,8 @@ interface Activity {
   description?: string | null;
   status: ActivityStatus;
   deadline?: string | null;
-  schedule_start?: string | null;
-  schedule_end?: string | null;
+  scheduled_date?: string | null;
   deadline_status?: DeadlineStatus | null;
-  priority?: Priority | null;
   updated_at: string;
   assignees?: Assignee[];
   department?: {
@@ -69,18 +66,6 @@ const getStatusLabel = (status: string) => {
   }
 };
 
-export const getPriorityBadge = (priority: Priority | null | undefined) => {
-  switch (priority) {
-    case "urgente":
-      return <Badge className="bg-orange-600 hover:bg-orange-700 text-white">URGENTE</Badge>;
-    case "media_urgencia":
-      return <Badge className="bg-blue-600 hover:bg-blue-700 text-white">MÉDIA URGÊNCIA</Badge>;
-    case "nao_urgente":
-      return <Badge className="bg-slate-500 hover:bg-slate-600 text-white">NÃO URGENTE</Badge>;
-    default:
-      return <span className="text-muted-foreground">—</span>;
-  }
-};
 
 const formatDate = (date: string | null | undefined) => {
   if (!date) return "—";
@@ -127,25 +112,23 @@ export const ActivityTable = ({
             <TableHead className="w-[300px]">Atividades</TableHead>
             <TableHead className="w-[200px]">Responsável</TableHead>
             <TableHead className="w-[100px]">Progresso</TableHead>
-            <TableHead className="w-[140px]">status</TableHead>
+            <TableHead className="w-[140px]">Status</TableHead>
             <TableHead className="w-[100px]">Departamento</TableHead>
-            <TableHead className="w-[110px]">Data Inicial</TableHead>
-            <TableHead className="w-[110px]">Data Final</TableHead>
+            <TableHead className="w-[110px]">Data Programada</TableHead>
             <TableHead className="w-[100px]">Prazo</TableHead>
-            <TableHead className="w-[100px]">Prioridade</TableHead>
             {showActions && <TableHead className="text-right w-[80px]">Ações</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
           {isLoading ? (
             <TableRow>
-              <TableCell colSpan={showActions ? 10 : 9} className="text-center py-8">
+              <TableCell colSpan={showActions ? 8 : 7} className="text-center py-8">
                 Carregando atividades...
               </TableCell>
             </TableRow>
           ) : activities.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={showActions ? 10 : 9} className="text-center text-muted-foreground py-12">
+              <TableCell colSpan={showActions ? 8 : 7} className="text-center text-muted-foreground py-12">
                 <div className="flex flex-col items-center gap-2">
                   <AlertCircle className="h-8 w-8 opacity-50" />
                   <p>{emptyMessage}</p>
@@ -211,14 +194,10 @@ export const ActivityTable = ({
                   )}
                 </TableCell>
                 <TableCell className="text-muted-foreground">
-                  {formatDate(activity.schedule_start)}
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {formatDate(activity.schedule_end)}
+                  {formatDate(activity.scheduled_date)}
                 </TableCell>
                 <TableCell>
                   {activity.deadline && !isNaN(new Date(activity.deadline).getTime()) ? (
-                    // Simple check based on date comparison
                     (new Date(activity.deadline) >= new Date() || activity.status === 'concluida') ? (
                       <div className="flex items-center gap-1 text-green-600">
                         <CheckCircle2 className="h-4 w-4" />
@@ -228,9 +207,6 @@ export const ActivityTable = ({
                       <span className="text-red-500 font-bold text-xs">! Atrasado</span>
                     )
                   ) : "—"}
-                </TableCell>
-                <TableCell>
-                  {getPriorityBadge(activity.priority)}
                 </TableCell>
                 {showActions && (
                   <TableCell className="text-right">

@@ -18,10 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getPriorityBadge } from "@/components/ActivityTable";
 import { Database } from "@/integrations/supabase/types";
-
-type Priority = 'urgente' | 'media_urgencia' | 'nao_urgente';
 
 interface GroupStats {
   name: string;
@@ -308,7 +305,6 @@ export function GlobalTasksPanel() {
             <TableHeader>
               <TableRow>
                 <TableHead>Tipo</TableHead>
-                <TableHead>Prioridade</TableHead>
                 <TableHead>Nome</TableHead>
                 <TableHead>Prazo</TableHead>
                 <TableHead>Status</TableHead>
@@ -330,7 +326,6 @@ export function GlobalTasksPanel() {
                         {activity.type === 'project' ? 'Projeto' : 'Departamento'}
                       </Badge>
                     </TableCell>
-                    <TableCell>{getPriorityBadge(activity.priority as Priority)}</TableCell>
                     <TableCell className="font-medium">{activity.name}</TableCell>
                     <TableCell>
                       {activity.deadline
