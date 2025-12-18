@@ -51,6 +51,7 @@ interface DepartmentActivity {
     profiles?: {
       id: string;
       full_name: string;
+      avatar_url?: string | null;
     } | null;
   }[];
 }
@@ -160,14 +161,14 @@ const Activities = () => {
 
       // Fetch profiles for assignees
       const userIds = [...new Set(assigneesData?.map(a => a.user_id) || [])];
-      let profilesData: { id: string; full_name: string }[] = [];
+      let profilesData: { id: string; full_name: string; avatar_url: string | null }[] = [];
       if (userIds.length > 0) {
-        const { data } = await supabase.from("profiles").select("id, full_name").in("id", userIds);
+        const { data } = await supabase.from("profiles").select("id, full_name, avatar_url").in("id", userIds);
         profilesData = data || [];
       }
 
       // Map profiles to assignees
-      const profilesMap = new Map<string, { id: string; full_name: string }>(
+      const profilesMap = new Map<string, { id: string; full_name: string; avatar_url: string | null }>(
         profilesData.map(p => [p.id, p])
       );
 

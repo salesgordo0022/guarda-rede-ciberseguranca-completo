@@ -2,6 +2,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Pencil, Trash2, CheckCircle, AlertCircle } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -15,6 +16,7 @@ interface Assignee {
   profiles?: {
     id: string;
     full_name: string;
+    avatar_url?: string | null;
   } | null;
 }
 
@@ -192,9 +194,12 @@ export const ActivityTable = ({
                 <TableCell className="text-muted-foreground">
                   <div className="flex items-center gap-2">
                     {activity.assignees && activity.assignees.length > 0 && (
-                      <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0">
-                        {activity.assignees[0].profiles?.full_name?.charAt(0).toUpperCase() || '?'}
-                      </div>
+                      <Avatar className="h-6 w-6 shrink-0">
+                        <AvatarImage src={activity.assignees[0].profiles?.avatar_url || undefined} />
+                        <AvatarFallback className="text-xs bg-primary text-primary-foreground">
+                          {activity.assignees[0].profiles?.full_name?.charAt(0).toUpperCase() || '?'}
+                        </AvatarFallback>
+                      </Avatar>
                     )}
                     <span className="truncate max-w-[150px]">{getAssigneeName(activity.assignees)}</span>
                   </div>
