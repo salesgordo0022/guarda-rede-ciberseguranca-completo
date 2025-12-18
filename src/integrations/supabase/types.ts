@@ -332,6 +332,48 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          activity_id: string | null
+          created_at: string
+          created_by: string
+          department_id: string | null
+          description: string | null
+          id: string
+          project_id: string | null
+          read: boolean | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          activity_id?: string | null
+          created_at?: string
+          created_by: string
+          department_id?: string | null
+          description?: string | null
+          id?: string
+          project_id?: string | null
+          read?: boolean | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          activity_id?: string | null
+          created_at?: string
+          created_by?: string
+          department_id?: string | null
+          description?: string | null
+          id?: string
+          project_id?: string | null
+          read?: boolean | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
