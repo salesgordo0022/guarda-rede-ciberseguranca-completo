@@ -29,7 +29,7 @@ interface AuthContextType extends AuthState {
   isAdmin: boolean;
   isGestor: boolean;
   isColaborador: boolean;
-  refetchProfile: () => Promise<void>;
+  refetchProfile: (companyId?: string | null) => Promise<void>;
   setSelectedCompanyId: (id: string | null) => void;
 }
 
@@ -67,37 +67,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       // Busca TODAS as empresas do usuário com suas roles
-      const { data: companiesData } = await supabase
+      const { data: companiesData, error: companiesError } = await supabase
         .from('user_companies')
         .select('company_id, role')
         .eq('user_id', userId)
         .order('created_at', { ascending: true });
 
-      const firstCompanyId = companiesData && companiesData.length > 0 
-        ? companiesData[0].company_id 
+      if (companiesError) {
+        console.error('Error fetching user companies:', companiesError);
+      }
+
+      const firstCompanyId = companiesData && companiesData.length > 0
+        ? companiesData[0].company_id
         : null;
 
       // Usa a empresa override ou a primeira empresa
       const targetCompanyId = overrideCompanyId || firstCompanyId;
 
-      // Busca a role da empresa selecionada (prioridade)
+      // Role vem prioritariamente da associação por empresa (user_companies)
       let userRole: 'admin' | 'gestor' | 'colaborador' = 'colaborador';
-      
-      if (targetCompanyId && companiesData) {
-        const companyRecord = companiesData.find(c => c.company_id === targetCompanyId);
+      const hasCompanyContext = !!(targetCompanyId && companiesData && companiesData.length > 0);
+
+      if (hasCompanyContext) {
+        const companyRecord = companiesData!.find(c => c.company_id === targetCompanyId);
         if (companyRecord?.role) {
           userRole = companyRecord.role as 'admin' | 'gestor' | 'colaborador';
         }
       }
 
-      // Fallback: busca role da tabela user_roles se não encontrou em user_companies
-      if (userRole === 'colaborador') {
-        const { data: roleData } = await supabase
+      // Fallback: se o usuário ainda não tiver empresas vinculadas, usa user_roles (papel global)
+      if (!hasCompanyContext) {
+        const { data: roleData, error: roleError } = await supabase
           .from('user_roles')
           .select('role')
           .eq('user_id', userId)
           .maybeSingle();
-        
+
+        if (roleError) {
+          console.error('Error fetching user role:', roleError);
+        }
+
         if (roleData?.role) {
           userRole = roleData.role as 'admin' | 'gestor' | 'colaborador';
         }
@@ -265,15 +274,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdmin,
       isGestor,
       isColaborador,
-      refetchProfile: async () => {
+      refetchProfile: async (companyId?: string | null) => {
         if (authState.user) {
           setAuthState(prev => ({ ...prev, companyLoading: true }));
-          // Usa a empresa selecionada atual para buscar a role correta
-          const { profile, companyId } = await fetchProfile(authState.user.id, authState.selectedCompanyId);
+          // Usa a empresa informada (quando existir) para buscar a role correta
+          const targetCompanyId = companyId ?? authState.selectedCompanyId;
+          const { profile, companyId: resolvedCompanyId } = await fetchProfile(authState.user.id, targetCompanyId);
           setAuthState(prev => ({
             ...prev,
             profile,
-            selectedCompanyId: prev.selectedCompanyId || companyId,
+            selectedCompanyId: prev.selectedCompanyId || resolvedCompanyId,
             companyLoading: false,
           }));
         }
