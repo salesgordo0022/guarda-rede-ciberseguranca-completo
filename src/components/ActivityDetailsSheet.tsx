@@ -383,36 +383,51 @@ export function ActivityDetailsSheet({
                         
                         // Notificar assignees sobre mudança de status
                         if (profile?.id) {
+                            const statusLabels: Record<string, string> = {
+                                'pendente': 'Não iniciado',
+                                'em_andamento': 'Em andamento',
+                                'concluida': 'Finalizado',
+                                'cancelada': 'Cancelado'
+                            };
+                            
                             const assigneesTable = isProject ? 'project_activity_assignees' : 'department_activity_assignees';
                             const { data: assignees } = await supabase
                                 .from(assigneesTable)
                                 .select('user_id')
                                 .eq('activity_id', activityId!);
                             
-                            if (assignees) {
-                                const statusLabels: Record<string, string> = {
-                                    'pendente': 'Não iniciado',
-                                    'em_andamento': 'Em andamento',
-                                    'concluida': 'Finalizado',
-                                    'cancelada': 'Cancelado'
-                                };
-                                
+                            if (assignees && assignees.length > 0) {
                                 for (const assignee of assignees) {
-                                    if (assignee.user_id !== profile.id) {
-                                        try {
-                                            await createNotification({
-                                                userId: assignee.user_id,
-                                                title: "Status da atividade alterado",
-                                                description: `"${formData.name}" mudou de ${statusLabels[initialActivity.status] || initialActivity.status} para ${statusLabels[formData.status] || formData.status}`,
-                                                type: "status_change",
-                                                activityId: activityId!,
-                                                departmentId: initialActivity.department_id,
-                                                createdBy: profile.id
-                                            });
-                                        } catch (e) {
-                                            console.error("Erro ao criar notificação:", e);
-                                        }
+                                    try {
+                                        await createNotification({
+                                            userId: assignee.user_id,
+                                            title: assignee.user_id === profile.id 
+                                                ? "Você finalizou uma atividade!" 
+                                                : "Status da atividade alterado",
+                                            description: `"${formData.name}" mudou de ${statusLabels[initialActivity.status] || initialActivity.status} para ${statusLabels[formData.status] || formData.status}`,
+                                            type: "status_change",
+                                            activityId: activityId!,
+                                            departmentId: initialActivity.department_id,
+                                            createdBy: profile.id
+                                        });
+                                    } catch (e) {
+                                        console.error("Erro ao criar notificação:", e);
                                     }
+                                }
+                            } else {
+                                // Se não houver assignees, notificar o próprio usuário que fez a ação
+                                try {
+                                    await createNotification({
+                                        userId: profile.id,
+                                        title: "Atividade atualizada",
+                                        description: `"${formData.name}" mudou para ${statusLabels[formData.status] || formData.status}`,
+                                        type: "status_change",
+                                        activityId: activityId!,
+                                        departmentId: initialActivity.department_id,
+                                        createdBy: profile.id
+                                    });
+                                } catch (e) {
+                                    console.error("Erro ao criar notificação:", e);
                                 }
                             }
                         }
