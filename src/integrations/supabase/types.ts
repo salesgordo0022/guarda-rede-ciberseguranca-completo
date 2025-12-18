@@ -58,9 +58,15 @@ export type Database = {
           description: string | null
           goal_date: string | null
           id: string
+          is_recurring: boolean | null
+          last_recurrence_date: string | null
           name: string
           order_index: number | null
+          parent_activity_id: string | null
           priority: string | null
+          recurrence_active: boolean | null
+          recurrence_day: number | null
+          recurrence_type: string | null
           scheduled_date: string | null
           status: Database["public"]["Enums"]["activity_status"] | null
           updated_at: string
@@ -77,9 +83,15 @@ export type Database = {
           description?: string | null
           goal_date?: string | null
           id?: string
+          is_recurring?: boolean | null
+          last_recurrence_date?: string | null
           name: string
           order_index?: number | null
+          parent_activity_id?: string | null
           priority?: string | null
+          recurrence_active?: boolean | null
+          recurrence_day?: number | null
+          recurrence_type?: string | null
           scheduled_date?: string | null
           status?: Database["public"]["Enums"]["activity_status"] | null
           updated_at?: string
@@ -96,9 +108,15 @@ export type Database = {
           description?: string | null
           goal_date?: string | null
           id?: string
+          is_recurring?: boolean | null
+          last_recurrence_date?: string | null
           name?: string
           order_index?: number | null
+          parent_activity_id?: string | null
           priority?: string | null
+          recurrence_active?: boolean | null
+          recurrence_day?: number | null
+          recurrence_type?: string | null
           scheduled_date?: string | null
           status?: Database["public"]["Enums"]["activity_status"] | null
           updated_at?: string
@@ -109,6 +127,13 @@ export type Database = {
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "department_activities_parent_activity_id_fkey"
+            columns: ["parent_activity_id"]
+            isOneToOne: false
+            referencedRelation: "department_activities"
             referencedColumns: ["id"]
           },
         ]
