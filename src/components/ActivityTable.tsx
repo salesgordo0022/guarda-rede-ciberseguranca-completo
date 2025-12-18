@@ -140,8 +140,8 @@ export const ActivityTable = ({
   };
 
   return (
-    <div className="rounded-md border">
-      <Table>
+    <div className="rounded-md border overflow-x-auto">
+      <Table className="min-w-[900px]">
         <TableHeader>
           <TableRow className="bg-muted/50 hover:bg-muted/50 text-xs uppercase">
             <TableHead className="w-[250px]">Atividades</TableHead>

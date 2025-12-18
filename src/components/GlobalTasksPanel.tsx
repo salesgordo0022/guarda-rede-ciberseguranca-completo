@@ -213,14 +213,14 @@ export function GlobalTasksPanel() {
 
   return (
     <>
-      <Card className="p-6">
+      <Card className="p-4 md:p-6 overflow-x-auto">
         {/* Header */}
-        <div className="grid grid-cols-6 gap-4 mb-3 pb-2 border-b">
-          <div className="col-span-1 font-semibold text-sm">Fonte</div>
-          <div className="text-center font-semibold text-sm">Atrasadas</div>
-          <div className="text-center font-semibold text-sm">Em Andamento</div>
-          <div className="text-center font-semibold text-sm">Pendentes</div>
-          <div className="text-center font-semibold text-sm">Concluídas</div>
+        <div className="grid grid-cols-6 gap-2 md:gap-4 mb-3 pb-2 border-b min-w-[500px]">
+          <div className="col-span-1 font-semibold text-xs md:text-sm">Fonte</div>
+          <div className="text-center font-semibold text-xs md:text-sm">Atrasadas</div>
+          <div className="text-center font-semibold text-xs md:text-sm">Em Andamento</div>
+          <div className="text-center font-semibold text-xs md:text-sm">Pendentes</div>
+          <div className="text-center font-semibold text-xs md:text-sm">Concluídas</div>
           <div></div>
         </div>
 

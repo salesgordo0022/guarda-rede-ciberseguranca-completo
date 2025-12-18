@@ -292,20 +292,20 @@ const Activities = () => {
   }
 
   return (
-    <div className="p-6 space-y-6 animate-fade-in">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6 animate-fade-in">
+      <div className="flex flex-col gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
             {currentDepartmentName || "Departamento"}
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-sm md:text-base text-muted-foreground">
             Gerencie as atividades deste departamento
           </p>
         </div>
 
         <Button
           onClick={() => setIsCreating(true)}
-          className="bg-primary hover:bg-primary/90 text-white shadow-lg hover:shadow-xl transition-all"
+          className="bg-primary hover:bg-primary/90 text-white shadow-lg hover:shadow-xl transition-all w-full sm:w-auto"
         >
           <Plus className="h-4 w-4 mr-2" />
           Nova Atividade
