@@ -1,4 +1,4 @@
-import { useEffect, useState, createContext, useContext, ReactNode } from 'react';
+import { useEffect, useRef, useState, createContext, useContext, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -44,6 +44,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     companyLoading: true,
     selectedCompanyId: null,
   });
+
+  // Evita loop de re-fetch em caso de ausência de empresa ou falhas intermitentes
+  const companyBootstrapRef = useRef<string | null>(null);
 
   const fetchProfile = async (userId: string): Promise<{ profile: UserProfile | null; companyId: string | null }> => {
     try {
@@ -172,6 +175,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     initializeAuth();
   }, []);
+
+  // Em alguns reloads, o listener + getSession podem gerar race e deixar selectedCompanyId nulo.
+  // Este efeito garante que sempre tentaremos selecionar a empresa do banco automaticamente (1x por usuário).
+  useEffect(() => {
+    if (authState.loading) return;
+
+    if (!authState.user) {
+      companyBootstrapRef.current = null;
+      return;
+    }
+
+    if (authState.selectedCompanyId) return;
+    if (authState.companyLoading) return;
+
+    // Só tenta uma vez por usuário (evita loop infinito quando o usuário não tem empresa)
+    if (companyBootstrapRef.current === authState.user.id) return;
+    companyBootstrapRef.current = authState.user.id;
+
+    let cancelled = false;
+
+    (async () => {
+      setAuthState(prev => ({ ...prev, companyLoading: true }));
+      const { profile, companyId } = await fetchProfile(authState.user!.id);
+
+      if (cancelled) return;
+
+      setAuthState(prev => ({
+        ...prev,
+        profile: profile ?? prev.profile,
+        selectedCompanyId: companyId,
+        companyLoading: false,
+      }));
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authState.loading, authState.user?.id, authState.companyLoading, authState.selectedCompanyId]);
 
   const signOut = async () => {
     try {
