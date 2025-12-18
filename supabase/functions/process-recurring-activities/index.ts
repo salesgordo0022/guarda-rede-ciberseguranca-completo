@@ -12,8 +12,9 @@ interface RecurringActivity {
   department_id: string
   priority: string | null
   created_by: string
-  recurrence_type: 'daily' | 'weekly' | 'monthly'
+  recurrence_type: 'daily' | 'weekly' | 'monthly' | 'yearly'
   recurrence_day: number | null
+  recurrence_month: number | null
   last_recurrence_date: string | null
 }
 
@@ -33,13 +34,14 @@ Deno.serve(async (req) => {
     const todayStr = today.toISOString().split('T')[0]
     const dayOfWeek = today.getDay() // 0 = Sunday, 6 = Saturday
     const dayOfMonth = today.getDate()
+    const monthOfYear = today.getMonth() + 1 // 1-12
 
-    console.log(`[process-recurring-activities] Running for date: ${todayStr}, dayOfWeek: ${dayOfWeek}, dayOfMonth: ${dayOfMonth}`)
+    console.log(`[process-recurring-activities] Running for date: ${todayStr}, dayOfWeek: ${dayOfWeek}, dayOfMonth: ${dayOfMonth}, month: ${monthOfYear}`)
 
     // Fetch all active recurring activities
     const { data: recurringActivities, error: fetchError } = await supabase
       .from('department_activities')
-      .select('id, name, description, department_id, priority, created_by, recurrence_type, recurrence_day, last_recurrence_date')
+      .select('id, name, description, department_id, priority, created_by, recurrence_type, recurrence_day, recurrence_month, last_recurrence_date')
       .eq('is_recurring', true)
       .eq('recurrence_active', true)
       .is('parent_activity_id', null) // Only parent (template) activities
@@ -65,7 +67,7 @@ Deno.serve(async (req) => {
     for (const activity of recurringActivities as RecurringActivity[]) {
       try {
         // Check if we should create a new instance today
-        const shouldCreate = shouldCreateToday(activity, todayStr, dayOfWeek, dayOfMonth)
+        const shouldCreate = shouldCreateToday(activity, todayStr, dayOfWeek, dayOfMonth, monthOfYear)
         
         if (!shouldCreate) {
           console.log(`[process-recurring-activities] Skipping activity ${activity.id} - not scheduled for today`)
@@ -79,7 +81,7 @@ Deno.serve(async (req) => {
         }
 
         // Calculate deadline based on recurrence type
-        const deadline = calculateNextDeadline(activity.recurrence_type, activity.recurrence_day, today)
+        const deadline = calculateNextDeadline(activity.recurrence_type, activity.recurrence_day, activity.recurrence_month, today)
 
         // Create new activity instance
         const { error: insertError } = await supabase
@@ -143,7 +145,8 @@ function shouldCreateToday(
   activity: RecurringActivity,
   todayStr: string,
   dayOfWeek: number,
-  dayOfMonth: number
+  dayOfMonth: number,
+  monthOfYear: number
 ): boolean {
   switch (activity.recurrence_type) {
     case 'daily':
@@ -153,10 +156,20 @@ function shouldCreateToday(
     case 'monthly':
       // Handle end of month cases (e.g., recurrence_day = 31 but month has 30 days)
       if (activity.recurrence_day === dayOfMonth) return true
-      // If it's the last day of the month and recurrence_day > last day
       const today = new Date(todayStr)
       const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
       if (dayOfMonth === lastDayOfMonth && activity.recurrence_day !== null && activity.recurrence_day > lastDayOfMonth) {
+        return true
+      }
+      return false
+    case 'yearly':
+      // Check if today matches the configured month and day
+      if (activity.recurrence_month !== monthOfYear) return false
+      if (activity.recurrence_day === dayOfMonth) return true
+      // Handle end of month cases for yearly (e.g., Feb 29 in non-leap years)
+      const todayDate = new Date(todayStr)
+      const lastDay = new Date(todayDate.getFullYear(), monthOfYear, 0).getDate()
+      if (dayOfMonth === lastDay && activity.recurrence_day !== null && activity.recurrence_day > lastDay) {
         return true
       }
       return false
@@ -168,6 +181,7 @@ function shouldCreateToday(
 function calculateNextDeadline(
   recurrenceType: string,
   recurrenceDay: number | null,
+  recurrenceMonth: number | null,
   today: Date
 ): string {
   const deadline = new Date(today)
@@ -183,6 +197,17 @@ function calculateNextDeadline(
     case 'monthly':
       // Deadline is next month same day
       deadline.setMonth(deadline.getMonth() + 1)
+      if (recurrenceDay !== null) {
+        const lastDay = new Date(deadline.getFullYear(), deadline.getMonth() + 1, 0).getDate()
+        deadline.setDate(Math.min(recurrenceDay, lastDay))
+      }
+      break
+    case 'yearly':
+      // Deadline is next year same month and day
+      deadline.setFullYear(deadline.getFullYear() + 1)
+      if (recurrenceMonth !== null) {
+        deadline.setMonth(recurrenceMonth - 1) // Month is 0-indexed
+      }
       if (recurrenceDay !== null) {
         const lastDay = new Date(deadline.getFullYear(), deadline.getMonth() + 1, 0).getDate()
         deadline.setDate(Math.min(recurrenceDay, lastDay))
