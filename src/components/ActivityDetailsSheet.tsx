@@ -33,28 +33,16 @@ import {
     CheckCircle2,
     AlertCircle,
     Save,
-    ListTodo,
-    Plus,
-    X,
-    Trash2
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/useAuth";
 
-interface ChecklistItem {
-    id: string; // Temporary ID for new items
-    text: string;
-    completed: boolean;
-    isNew?: boolean;
-}
-
 interface ActivityDetailsSheetProps {
-    activity: any | null; // Null in create mode (initially)
+    activity: any | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
     mode?: 'view' | 'create';
@@ -78,15 +66,9 @@ export function ActivityDetailsSheet({
     const [formData, setFormData] = useState({
         name: "",
         status: "pendente",
-        schedule_start: "",
-        schedule_end: "",
         deadline: "",
-        priority: "nao_urgente",
         description: ""
     });
-    // Checklist State
-    const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
-    const [newChecklistItemText, setNewChecklistItemText] = useState("");
 
     // Initialize/Reset Form
     useEffect(() => {
@@ -95,47 +77,20 @@ export function ActivityDetailsSheet({
                 setFormData({
                     name: initialActivity.name || "",
                     status: initialActivity.status || "pendente",
-                    schedule_start: initialActivity.schedule_start ? initialActivity.schedule_start.split('T')[0] : "",
-                    schedule_end: initialActivity.schedule_end ? initialActivity.schedule_end.split('T')[0] : "",
                     deadline: initialActivity.deadline ? initialActivity.deadline.split('T')[0] : "",
-                    priority: initialActivity.priority || "nao_urgente",
                     description: initialActivity.description || ""
                 });
-                fetchChecklist(initialActivity.id);
             } else {
                 // Create Mode
                 setFormData({
                     name: "",
                     status: "pendente",
-                    schedule_start: "",
-                    schedule_end: "",
                     deadline: "",
-                    priority: "nao_urgente",
                     description: ""
                 });
-                setChecklistItems([]);
             }
         }
     }, [open, mode, initialActivity]);
-
-    const fetchChecklist = async (activityId: string) => {
-        const { data } = await supabase
-            .from('checklist_items')
-            .select('*')
-            .eq('activity_id', activityId)
-            .order('created_at', { ascending: true });
-
-        if (data) {
-            setChecklistItems(data.map(item => ({
-                id: item.id,
-                text: item.text,
-                completed: item.completed,
-                isNew: false
-            })));
-        } else {
-            setChecklistItems([]);
-        }
-    };
 
     const handleSave = async () => {
         if (!formData.name.trim()) {
@@ -151,17 +106,13 @@ export function ActivityDetailsSheet({
             const activityData: any = {
                 name: formData.name,
                 status: formData.status,
-                priority: formData.priority,
                 description: formData.description,
-                schedule_start: formData.schedule_start ? new Date(formData.schedule_start).toISOString() : null,
-                schedule_end: formData.schedule_end ? new Date(formData.schedule_end).toISOString() : null,
-                deadline: formData.deadline ? new Date(formData.deadline).toISOString() : null,
+                deadline: formData.deadline ? formData.deadline : null,
             };
 
             let activityId = initialActivity?.id;
 
             if (mode === 'create') {
-                // Insert new activity
                 if (isProject) {
                     activityData.project_id = preselectedProjectId;
                 } else {
@@ -173,13 +124,12 @@ export function ActivityDetailsSheet({
                     .from(table)
                     .insert(activityData)
                     .select()
-                    .single(); // Ensure we get the ID back
+                    .single();
 
                 if (error) throw error;
                 activityId = data.id;
                 toast.success("Atividade criada com sucesso!");
             } else {
-                // Update existing
                 const { error } = await supabase
                     .from(table)
                     .update(activityData)
@@ -187,30 +137,6 @@ export function ActivityDetailsSheet({
 
                 if (error) throw error;
                 toast.success("Atividade atualizada com sucesso!");
-            }
-
-            // Save Checklist Items
-            if (activityId) {
-                // 1. Delete removed items (if we tracked them, but for simplicity relying on 'upsert' or manual management if complex. 
-                // For now, simpler approach: Insert new ones, Update changed ones.
-                // Mock mock doesn't support complex upsert well on non-primary keys sometimes so careful loop.)
-
-                const promises = checklistItems.map(async (item) => {
-                    if (item.isNew) {
-                        return supabase.from('checklist_items').insert({
-                            activity_id: activityId,
-                            text: item.text,
-                            completed: item.completed
-                        });
-                    } else {
-                        return supabase.from('checklist_items').update({
-                            text: item.text,
-                            completed: item.completed
-                        }).eq('id', item.id);
-                    }
-                });
-
-                await Promise.all(promises);
             }
 
             // Invalidate queries
@@ -226,36 +152,6 @@ export function ActivityDetailsSheet({
         } finally {
             setLoading(false);
         }
-    };
-
-    const handleAddChecklistItem = (e?: React.FormEvent) => {
-        e?.preventDefault();
-        if (!newChecklistItemText.trim()) return;
-
-        const newItem: ChecklistItem = {
-            id: `temp-${Date.now()}`,
-            text: newChecklistItemText,
-            completed: false,
-            isNew: true
-        };
-
-        setChecklistItems([...checklistItems, newItem]);
-        setNewChecklistItemText("");
-    };
-
-    const toggleChecklistItem = (id: string, checked: boolean) => {
-        setChecklistItems(prev => prev.map(item =>
-            item.id === id ? { ...item, completed: checked } : item
-        ));
-    };
-
-    const deleteChecklistItem = async (id: string) => {
-        if (!id.startsWith('temp-')) {
-            // If it's a real item, delete from DB immediately (or mark for deletion)
-            // For immediate feedback:
-            await supabase.from('checklist_items').delete().eq('id', id);
-        }
-        setChecklistItems(prev => prev.filter(item => item.id !== id));
     };
 
     const handleChange = (field: string, value: string) => {
@@ -349,43 +245,6 @@ export function ActivityDetailsSheet({
                                 </div>
                             </InputWrapper>
                         
-                            <InputWrapper icon={User} label="Responsável">
-                                <div className="flex items-center gap-2">
-                                    {initialActivity?.assignees && initialActivity.assignees.length > 0 ? (
-                                        <>
-                                            <Avatar className="h-6 w-6">
-                                                <AvatarFallback className="text-xs">
-                                                    {initialActivity.assignees[0].profiles?.full_name?.charAt(0).toUpperCase() || '?'}
-                                                </AvatarFallback>
-                                            </Avatar>
-                                            <span className="text-sm">
-                                                {initialActivity.assignees[0].profiles?.full_name || initialActivity.assignees[0].user_id}
-                                            </span>
-                                        </>
-                                    ) : (
-                                        <span className="text-muted-foreground text-sm">—</span>
-                                    )}
-                                </div>
-                            </InputWrapper>
-                        
-                            <InputWrapper icon={Calendar} label="Data Inicial">
-                                <Input
-                                    type="date"
-                                    value={formData.schedule_start}
-                                    onChange={(e) => handleChange('schedule_start', e.target.value)}
-                                    className="w-[180px]"
-                                />
-                            </InputWrapper>
-                        
-                            <InputWrapper icon={Calendar} label="Data Final">
-                                <Input
-                                    type="date"
-                                    value={formData.schedule_end}
-                                    onChange={(e) => handleChange('schedule_end', e.target.value)}
-                                    className="w-[180px]"
-                                />
-                            </InputWrapper>
-                        
                             <InputWrapper icon={AlertCircle} label="Prazo">
                                 <Input
                                     type="date"
@@ -394,99 +253,23 @@ export function ActivityDetailsSheet({
                                     className="w-[180px]"
                                 />
                             </InputWrapper>
-                        
-                            <InputWrapper icon={Flag} label="Prioridade">
-                                <Select value={formData.priority} onValueChange={(val) => handleChange('priority', val)}>
-                                    <SelectTrigger className="w-[180px]">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="urgente" className="text-orange-600 font-medium">URGENTE</SelectItem>
-                                        <SelectItem value="media_urgencia" className="text-blue-600 font-medium">MÉDIA URGÊNCIA</SelectItem>
-                                        <SelectItem value="nao_urgente" className="text-slate-500 font-medium">NÃO URGENTE</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </InputWrapper>
-                        
-                            <div className="grid grid-cols-[140px_1fr] items-start gap-4 pt-2">
-                                <div className="flex items-center gap-2 text-muted-foreground text-sm font-medium mt-2">
-                                    <Tag className="h-4 w-4" />
-                                    Descrição
-                                </div>
-                                <Textarea
-                                    value={formData.description}
-                                    onChange={(e) => handleChange('description', e.target.value)}
-                                    placeholder="Adicione uma descrição detalhada..."
-                                    className="min-h-[150px] resize-none text-sm leading-relaxed"
-                                />
-                            </div>
-                        
                         </div>
+
                         <Separator />
 
-                        {/* Checklist Section */}
+                        {/* Description */}
                         <div className="space-y-4">
-                            <h3 className="font-semibold flex items-center gap-2 text-lg">
-                                <ListTodo className="h-5 w-5" />
-                                Checklist
-                            </h3>
-
-                            <div className="space-y-2">
-                                {checklistItems.map((item) => (
-                                    <div key={item.id} className="flex items-center gap-3 group">
-                                        <Checkbox
-                                            checked={item.completed}
-                                            onCheckedChange={(checked) => toggleChecklistItem(item.id, checked as boolean)}
-                                        />
-                                        <span className={`flex-1 text-sm ${item.completed ? 'line-through text-muted-foreground' : ''}`}>
-                                            {item.text}
-                                        </span>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-700 hover:bg-red-50"
-                                            onClick={() => deleteChecklistItem(item.id)}
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                ))}
+                            <div className="flex items-center gap-2 text-muted-foreground font-medium">
+                                <MessageSquare className="h-4 w-4" />
+                                Descrição
                             </div>
-
-                            <form onSubmit={handleAddChecklistItem} className="flex items-center gap-2">
-                                <Plus className="h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    value={newChecklistItemText}
-                                    onChange={(e) => setNewChecklistItemText(e.target.value)}
-                                    placeholder="Adicionar item ao checklist..."
-                                    className="border-none shadow-none focus-visible:ring-0 px-0 h-auto placeholder:text-muted-foreground/70"
-                                />
-                            </form>
+                            <Textarea
+                                value={formData.description}
+                                onChange={(e) => handleChange('description', e.target.value)}
+                                placeholder="Adicione uma descrição detalhada para esta atividade..."
+                                className="min-h-[200px] resize-none"
+                            />
                         </div>
-
-                        <Separator />
-
-
-                        {/* Comments Section */}
-                        {(mode === 'view' || initialActivity) && (
-                            <div className="space-y-6">
-                                <h3 className="font-semibold flex items-center gap-2 text-lg">
-                                    <MessageSquare className="h-5 w-5" />
-                                    Comentários
-                                </h3>
-                                {/* Mock comments */}
-                                <div className="flex gap-3 pt-2">
-                                    <Avatar className="h-8 w-8">
-                                        <AvatarFallback className="text-xs">EU</AvatarFallback>
-                                    </Avatar>
-                                    <div className="flex-1">
-                                        <Button variant="outline" className="w-full text-muted-foreground justify-start h-20 items-start pt-2">
-                                            Adicionar um comentário...
-                                        </Button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
                     </div>
                 </ScrollArea>
             </SheetContent>

@@ -4,11 +4,9 @@ import {
   Settings,
   Search,
   LogOut,
-  Play,
   HelpCircle,
   Building2,
   Plus,
-  Users,
   Rocket
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
@@ -33,11 +31,9 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Tutorial } from "@/components/Tutorial";
-import { NotificationBell } from "@/components/NotificationBell";
 
 const mainMenuItems = [
   { title: "Painel de Controle", url: "/", icon: LayoutDashboard },
@@ -49,12 +45,12 @@ export function AppSidebar() {
   const { open } = useSidebar();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
-  const { profile, signOut, isAdmin, selectedCompanyId, setSelectedCompanyId } = useAuth();
+  const { profile, signOut, selectedCompanyId, setSelectedCompanyId } = useAuth();
   const [newCompanyName, setNewCompanyName] = useState("");
   const [isCreatingCompany, setIsCreatingCompany] = useState(false);
 
   // Buscar empresas disponíveis
-  const { data: companies = [], refetch: refetchCompanies } = useQuery({
+  const { data: companies = [] } = useQuery({
     queryKey: ['companies'],
     queryFn: async () => {
       const { data, error } = await supabase.from('companies').select('id, name');
@@ -81,12 +77,26 @@ export function AppSidebar() {
     enabled: !!selectedCompanyId,
   });
 
+  // Buscar role do usuário
+  const { data: userRole } = useQuery({
+    queryKey: ['user-role', profile?.id],
+    queryFn: async () => {
+      if (!profile?.id) return null;
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', profile.id)
+        .single();
+      return data?.role || 'colaborador';
+    },
+    enabled: !!profile?.id
+  });
+
   const handleCreateCompany = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCompanyName.trim() || !profile?.id) return;
 
     try {
-      // 1. Create Company
       const { data: company, error } = await supabase
         .from('companies')
         .insert({
@@ -98,25 +108,16 @@ export function AppSidebar() {
 
       if (error) throw error;
 
-      // 2. Link User
+      // Link User
       await supabase.from('user_companies').insert({
         user_id: profile.id,
         company_id: company.id,
         role: 'admin'
       });
 
-      // 3. Update Profile Logic (Role & Current Company)
-      await supabase.from('user_roles').insert({
-        user_id: profile.id,
-        role: 'admin'
-      });
-      await supabase.from('profiles').update({ role: 'admin', company_id: company.id }).eq('id', profile.id);
-
       toast.success("Empresa criada com sucesso!");
       setIsCreatingCompany(false);
       setNewCompanyName("");
-
-      // Force reload to update context
       window.location.reload();
 
     } catch (error: any) {
@@ -153,7 +154,7 @@ export function AppSidebar() {
                 <div className="font-bold text-sidebar-foreground inline-flex items-center gap-1">
                   {profile?.full_name || 'Usuário'}
                 </div>
-                <p className="text-sm text-sidebar-foreground/70 capitalize">{profile?.role || 'Visitante'}</p>
+                <p className="text-sm text-sidebar-foreground/70 capitalize">{userRole || 'Visitante'}</p>
               </div>
             </div>
 

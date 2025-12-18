@@ -8,11 +8,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 
 export const ProfileSettings = () => {
-  const { user, profile, refetchProfile } = useAuth();
-  console.log('ProfileSettings Debug:', { profile, user });
+  const { user, profile, refetchProfile, selectedCompanyId } = useAuth();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -25,29 +24,28 @@ export const ProfileSettings = () => {
 
   // Company state
   const [companyName, setCompanyName] = useState("");
-  const [currentCompany, setCurrentCompany] = useState<{ name: string } | null>(null);
+
+  // Fetch current company
+  const { data: currentCompany } = useQuery({
+    queryKey: ['current-company', selectedCompanyId],
+    queryFn: async () => {
+      if (!selectedCompanyId) return null;
+      const { data } = await supabase
+        .from('companies')
+        .select('name')
+        .eq('id', selectedCompanyId)
+        .single();
+      return data;
+    },
+    enabled: !!selectedCompanyId
+  });
 
   // Sync fullName with profile
   useEffect(() => {
     if (profile?.full_name) {
       setFullName(profile.full_name);
     }
-    if (profile?.company_id) {
-      fetchCompany(profile.company_id);
-    }
-  }, [profile?.full_name, profile?.company_id]);
-
-  const fetchCompany = async (companyId: string) => {
-    const { data } = await supabase
-      .from('companies')
-      .select('name')
-      .eq('id', companyId)
-      .single();
-
-    if (data) {
-      setCurrentCompany(data);
-    }
-  };
+  }, [profile?.full_name]);
 
   // Update profile name
   const updateProfileMutation = useMutation({
@@ -75,38 +73,24 @@ export const ProfileSettings = () => {
     mutationFn: async (name: string) => {
       if (!user?.id) throw new Error("Usuário não autenticado");
 
-      // 1. Create Company
       const { data: company, error: companyError } = await supabase
         .from('companies')
-        .insert({ name })
+        .insert({ name, created_by: user.id })
         .select()
         .single();
 
       if (companyError) throw companyError;
 
-      // 2. Link user to company (user_companies)
-      // Nota: No banco real isso poderia ser via trigger, mas no mock fazemos manual
+      // Link user to company
       const { error: linkError } = await supabase
         .from('user_companies')
         .insert({
           user_id: user.id,
-          company_id: company.id
+          company_id: company.id,
+          role: 'admin'
         });
 
       if (linkError) throw linkError;
-
-      // 3. Update profile role to admin
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({
-          user_id: user.id,
-          role: 'admin' // Quem cria a empresa vira admin
-        });
-
-      // Se der erro de duplicate key no role, tentamos update (embora insert deva funcionar no mock)
-      if (roleError) {
-        await supabase.from('profiles').update({ role: 'admin' }).eq('id', user.id);
-      }
 
       return company;
     },
@@ -114,7 +98,7 @@ export const ProfileSettings = () => {
       refetchProfile();
       toast.success("Empresa criada com sucesso!");
       setCompanyName("");
-      window.location.reload(); // Forçar reload para atualizar todos os contextos
+      window.location.reload();
     },
     onError: (error: Error) => {
       toast.error("Erro ao criar empresa: " + error.message);
@@ -126,13 +110,11 @@ export const ProfileSettings = () => {
     const file = event.target.files?.[0];
     if (!file || !user?.id) return;
 
-    // Validate file type
     if (!file.type.startsWith("image/")) {
       toast.error("Por favor, selecione uma imagem válida");
       return;
     }
 
-    // Validate file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
       toast.error("A imagem deve ter no máximo 2MB");
       return;
@@ -144,19 +126,16 @@ export const ProfileSettings = () => {
       const fileExt = file.name.split(".").pop();
       const filePath = `${user.id}/avatar.${fileExt}`;
 
-      // Upload to storage
       const { error: uploadError } = await supabase.storage
         .from("avatars")
         .upload(filePath, file, { upsert: true });
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
       const { data: urlData } = supabase.storage
         .from("avatars")
         .getPublicUrl(filePath);
 
-      // Update profile with avatar URL
       const { error: updateError } = await supabase
         .from("profiles")
         .update({ avatar_url: urlData.publicUrl + "?t=" + Date.now() })
@@ -295,21 +274,18 @@ export const ProfileSettings = () => {
             Configurações da Empresa
           </CardTitle>
           <CardDescription>
-            {profile?.company_id
+            {selectedCompanyId
               ? "Visualize as informações da sua empresa"
               : "Crie uma nova organização para começar"
             }
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {profile?.company_id ? (
+          {selectedCompanyId ? (
             <div className="p-4 bg-muted rounded-lg border">
               <div className="space-y-1">
                 <p className="text-sm font-medium text-muted-foreground">Empresa Atual</p>
                 <p className="text-xl font-bold">{currentCompany?.name || "Carregando..."}</p>
-                <p className="text-sm text-muted-foreground">
-                  ID: <span className="font-mono text-xs">{profile.company_id}</span>
-                </p>
               </div>
             </div>
           ) : (
@@ -385,51 +361,6 @@ export const ProfileSettings = () => {
           </Button>
         </CardContent>
       </Card>
-
-      {/* System Status Card (Debug) */}
-      <Card className="border-red-200 bg-red-50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-red-800">
-            <Lock className="h-5 w-5" />
-            Diagnóstico do Sistema (Debug)
-          </CardTitle>
-          <CardDescription>
-            Informações técnicas para verificar se a criação funcionou.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="text-sm font-mono bg-white p-2 rounded border">
-            <p><strong>User ID:</strong> {user?.id}</p>
-            <p><strong>Profile Role:</strong> {profile?.role}</p>
-            <p><strong>Profile Company ID:</strong> {profile?.company_id ?? 'NULL (Sem empresa)'}</p>
-            <p><strong>Sessão Atualizada:</strong> {new Date().toLocaleTimeString()}</p>
-          </div>
-
-          <div className="text-sm">
-            <p className="font-bold mb-2">Empresas no Banco de Dados:</p>
-            <CompaniesList />
-          </div>
-        </CardContent>
-      </Card>
     </div>
-  );
-};
-
-const CompaniesList = () => {
-  const [companies, setCompanies] = useState<any[]>([]);
-
-  useEffect(() => {
-    supabase.from('companies').select('*').then(({ data }) => {
-      if (data) setCompanies(data);
-    });
-  }, []);
-
-  return (
-    <ul className="list-disc pl-5">
-      {companies.length === 0 && <li>Nenhuma empresa encontrada.</li>}
-      {companies.map(c => (
-        <li key={c.id}>{c.name} (ID: {c.id})</li>
-      ))}
-    </ul>
   );
 };
