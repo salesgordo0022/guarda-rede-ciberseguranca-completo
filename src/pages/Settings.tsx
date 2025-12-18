@@ -302,39 +302,39 @@ const Settings = () => {
     }
 
     return (
-        <div className="p-6 space-y-6">
+        <div className="p-4 md:p-6 space-y-4 md:space-y-6">
             <div>
-                <h1 className="text-3xl font-bold mb-2">Configurações</h1>
-                <p className="text-muted-foreground">
+                <h1 className="text-2xl md:text-3xl font-bold mb-2">Configurações</h1>
+                <p className="text-sm md:text-base text-muted-foreground">
                     Gerencie departamentos e personalize o sistema
                 </p>
             </div>
 
             <Tabs defaultValue="profile" className="w-full">
-                <TabsList className={`grid w-full max-w-3xl ${isAdmin ? 'grid-cols-5' : 'grid-cols-3'}`}>
-                    <TabsTrigger value="profile">
-                        <User className="h-4 w-4 mr-2" />
-                        Perfil
+                <TabsList className={`grid w-full max-w-3xl ${isAdmin ? 'grid-cols-3 md:grid-cols-5' : 'grid-cols-3'} h-auto`}>
+                    <TabsTrigger value="profile" className="flex-col md:flex-row gap-1 py-2 text-xs md:text-sm">
+                        <User className="h-4 w-4" />
+                        <span className="hidden sm:inline">Perfil</span>
                     </TabsTrigger>
                     {isAdmin && (
-                        <TabsTrigger value="departments">
-                            <Building2 className="h-4 w-4 mr-2" />
-                            Departamentos
+                        <TabsTrigger value="departments" className="flex-col md:flex-row gap-1 py-2 text-xs md:text-sm">
+                            <Building2 className="h-4 w-4" />
+                            <span className="hidden sm:inline">Departamentos</span>
                         </TabsTrigger>
                     )}
-                    <TabsTrigger value="appearance">
-                        <Palette className="h-4 w-4 mr-2" />
-                        Aparência
+                    <TabsTrigger value="appearance" className="flex-col md:flex-row gap-1 py-2 text-xs md:text-sm">
+                        <Palette className="h-4 w-4" />
+                        <span className="hidden sm:inline">Aparência</span>
                     </TabsTrigger>
                     {isAdmin && (
-                        <TabsTrigger value="team">
-                            <Users className="h-4 w-4 mr-2" />
-                            Equipe
+                        <TabsTrigger value="team" className="flex-col md:flex-row gap-1 py-2 text-xs md:text-sm">
+                            <Users className="h-4 w-4" />
+                            <span className="hidden sm:inline">Equipe</span>
                         </TabsTrigger>
                     )}
-                    <TabsTrigger value="history">
-                        <History className="h-4 w-4 mr-2" />
-                        Histórico
+                    <TabsTrigger value="history" className="flex-col md:flex-row gap-1 py-2 text-xs md:text-sm">
+                        <History className="h-4 w-4" />
+                        <span className="hidden sm:inline">Histórico</span>
                     </TabsTrigger>
                 </TabsList>
 

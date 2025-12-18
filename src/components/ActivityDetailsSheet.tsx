@@ -653,9 +653,9 @@ export function ActivityDetailsSheet({
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent className="w-full sm:max-w-3xl overflow-hidden flex flex-col p-0 border-l-4 border-l-primary/10">
+            <SheetContent className="w-full sm:max-w-3xl overflow-hidden flex flex-col p-0 border-l-4 border-l-primary/10" side="right">
                 <ScrollArea className="h-full">
-                    <div className="p-6 space-y-6">
+                    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
                         {/* Header */}
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">
@@ -683,7 +683,7 @@ export function ActivityDetailsSheet({
                             <Input
                                 value={formData.name}
                                 onChange={(e) => handleChange('name', e.target.value)}
-                                className="text-2xl font-bold border-none shadow-none px-0 h-auto focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/50"
+                                className="text-xl md:text-2xl font-bold border-none shadow-none px-0 h-auto focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/50"
                                 placeholder="Nome da Atividade"
                             />
                         </div>

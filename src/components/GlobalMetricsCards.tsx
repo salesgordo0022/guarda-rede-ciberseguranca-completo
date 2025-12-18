@@ -74,7 +74,7 @@ export function GlobalMetricsCards() {
 
   return (
     <>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 md:gap-4 grid-cols-2 lg:grid-cols-4">
         <Card 
           className="border-green-200 bg-green-50/50 cursor-pointer hover:shadow-md transition-shadow"
           onClick={() => handleCategoryClick('completed')}
@@ -136,7 +136,7 @@ export function GlobalMetricsCards() {
 
       {/* Dialog de detalhes */}
       <Dialog open={!!selectedCategory} onOpenChange={() => setSelectedCategory(null)}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] md:max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{selectedCategory?.title}</DialogTitle>
             <DialogDescription className="flex items-center gap-4">
@@ -154,7 +154,8 @@ export function GlobalMetricsCards() {
             </DialogDescription>
           </DialogHeader>
 
-          <Table>
+          <div className="overflow-x-auto">
+          <Table className="min-w-[500px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Tipo</TableHead>
@@ -202,6 +203,7 @@ export function GlobalMetricsCards() {
               )}
             </TableBody>
           </Table>
+          </div>
         </DialogContent>
       </Dialog>
     </>

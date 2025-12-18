@@ -75,34 +75,36 @@ const Index = () => {
   ] : [];
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+      <div className="flex flex-col gap-2">
         <div>
-          <h1 className="text-3xl font-bold">Painel de Controle</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl md:text-3xl font-bold">Painel de Controle</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
             Bem-vindo de volta, {profile?.full_name || 'usuário'}
           </p>
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-        <div className="relative flex-1 max-w-md">
+      <div className="flex flex-col gap-4">
+        <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             type="text"
             placeholder="Digite aqui para começar a pesquisa..."
-            className="pl-9"
+            className="pl-9 w-full"
           />
         </div>
 
-        <ActionButtons
-          onCreateTask={() => setIsCreateTaskOpen(true)}
-          date={date}
-          onDateChange={setDate}
-        />
+        <div className="flex flex-wrap gap-2">
+          <ActionButtons
+            onCreateTask={() => setIsCreateTaskOpen(true)}
+            date={date}
+            onDateChange={setDate}
+          />
+        </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
         <DashboardCard
           title="Total de Atividades"
           value={metrics?.total || 0}
@@ -126,7 +128,7 @@ const Index = () => {
       {/* Cards de métricas clicáveis */}
       <GlobalMetricsCards />
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         <TaskChart
           type="pie"
           title="Distribuição de Atividades"
@@ -155,20 +157,20 @@ const Index = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
             <div className="space-y-2">
               <p className="text-sm font-medium text-muted-foreground">Total de Atividades</p>
-              <p className="text-3xl font-bold">{metrics?.total || 0}</p>
+              <p className="text-2xl md:text-3xl font-bold">{metrics?.total || 0}</p>
             </div>
             <div className="space-y-2">
               <p className="text-sm font-medium text-muted-foreground">Taxa de Conclusão</p>
-              <p className="text-3xl font-bold text-green-600">
+              <p className="text-2xl md:text-3xl font-bold text-green-600">
                 {metrics?.total ? ((metrics.completed / metrics.total) * 100).toFixed(1) : 0}%
               </p>
             </div>
             <div className="space-y-2">
               <p className="text-sm font-medium text-muted-foreground">Atividades Atrasadas</p>
-              <p className="text-3xl font-bold text-red-600">
+              <p className="text-2xl md:text-3xl font-bold text-red-600">
                 {metrics?.overdue || 0}
               </p>
             </div>
