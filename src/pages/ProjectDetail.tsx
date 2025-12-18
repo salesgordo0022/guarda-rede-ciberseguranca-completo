@@ -72,43 +72,37 @@ const ProjectDetail = () => {
       return data as Project;
     },
     enabled: !!projectId,
+    staleTime: 1000 * 60 * 2, // 2 minutos
   });
 
-  // Fetch company users (profiles)
+  // Fetch company users (profiles) - otimizado com Promise.all
   const { data: companyUsers = [] } = useQuery({
     queryKey: ['company-users', selectedCompanyId],
     queryFn: async () => {
       if (!selectedCompanyId) return [];
 
-      // Primeiro busca os user_ids da empresa
+      // Busca user_ids da empresa
       const { data: userCompanies, error: ucError } = await supabase
         .from('user_companies')
         .select('user_id')
         .eq('company_id', selectedCompanyId);
 
-      if (ucError) {
-        console.error('Erro ao buscar membros da empresa:', ucError);
-        return [];
-      }
-
-      if (!userCompanies || userCompanies.length === 0) return [];
+      if (ucError || !userCompanies || userCompanies.length === 0) return [];
 
       const userIds = userCompanies.map(uc => uc.user_id);
 
-      // Depois busca os perfis desses usuários
+      // Busca perfis desses usuários
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('id, full_name, avatar_url')
         .in('id', userIds);
 
-      if (profilesError) {
-        console.error('Erro ao buscar perfis:', profilesError);
-        return [];
-      }
+      if (profilesError) return [];
 
       return profiles || [];
     },
-    enabled: !!selectedCompanyId
+    enabled: !!selectedCompanyId,
+    staleTime: 1000 * 60 * 5, // 5 minutos
   });
 
   // Fetch project members
@@ -122,21 +116,17 @@ const ProjectDetail = () => {
         .select('user_id')
         .eq('project_id', projectId);
       
-      if (error) {
-        console.error('Erro ao buscar membros do projeto:', error);
-        return [];
-      }
+      if (error) return [];
       
       return data.map(m => m.user_id);
     },
-    enabled: !!projectId
+    enabled: !!projectId,
+    staleTime: 1000 * 60, // 1 minuto
   });
 
   // Mutation to toggle project member
   const toggleMemberMutation = useMutation({
     mutationFn: async ({ userId, isAdding }: { userId: string; isAdding: boolean }) => {
-      console.log('Toggle member mutation:', { userId, isAdding, projectId });
-      
       if (isAdding) {
         // Evita erro de chave duplicada verificando antes de inserir
         const { data: existingMember, error: checkError } = await supabase
@@ -146,10 +136,7 @@ const ProjectDetail = () => {
           .eq('user_id', userId)
           .maybeSingle();
 
-        if (checkError) {
-          console.error('Error checking existing member:', checkError);
-          throw checkError;
-        }
+        if (checkError) throw checkError;
 
         // Já é membro, não faz nada
         if (existingMember) return;
@@ -158,10 +145,7 @@ const ProjectDetail = () => {
           .from('project_members')
           .insert({ project_id: projectId!, user_id: userId });
 
-        if (error) {
-          console.error('Error adding member:', error);
-          throw error;
-        }
+        if (error) throw error;
       } else {
         const { data: existingMember, error: checkError } = await supabase
           .from('project_members')
@@ -170,11 +154,7 @@ const ProjectDetail = () => {
           .eq('user_id', userId)
           .maybeSingle();
 
-        console.log('Existing member check:', { existingMember, checkError });
-
-        if (checkError) {
-          throw checkError;
-        }
+        if (checkError) throw checkError;
 
         if (existingMember) {
           const { error } = await supabase
@@ -182,10 +162,7 @@ const ProjectDetail = () => {
             .delete()
             .eq('project_id', projectId!)
             .eq('user_id', userId);
-          if (error) {
-            console.error('Error removing member:', error);
-            throw error;
-          }
+          if (error) throw error;
         }
       }
     },
@@ -224,7 +201,6 @@ const ProjectDetail = () => {
   const handleToggleMember = (userId: string) => {
     if (toggleMemberMutation.isPending) return; // Prevent double clicks
     const isCurrentlyMember = projectMembers.includes(userId);
-    console.log('Handle toggle member:', { userId, isCurrentlyMember });
     toggleMemberMutation.mutate({ userId, isAdding: !isCurrentlyMember });
   };
 

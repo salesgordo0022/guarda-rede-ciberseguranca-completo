@@ -38,7 +38,7 @@ const Projects = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'kanban'>('grid');
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
 
-  // Fetch projects with member filtering
+  // Fetch projects with member filtering - otimizado
   const { data: projects = [], isLoading, error } = useQuery({
     queryKey: ["projects", selectedCompanyId, profile?.id, isAdmin],
     queryFn: async () => {
@@ -57,7 +57,6 @@ const Projects = () => {
       }
 
       // Não-admin: busca projetos onde é membro ou criador
-      // 1. Buscar IDs dos projetos onde é membro
       const { data: memberProjects, error: memberError } = await supabase
         .from("project_members")
         .select("project_id")
@@ -67,7 +66,6 @@ const Projects = () => {
 
       const memberProjectIds = memberProjects?.map(m => m.project_id) || [];
 
-      // 2. Buscar projetos onde é criador OU é membro
       const { data, error } = await supabase
         .from("projects")
         .select("*")
@@ -79,15 +77,15 @@ const Projects = () => {
       return data as Project[];
     },
     enabled: !!selectedCompanyId && !!profile?.id,
+    staleTime: 1000 * 60 * 2, // 2 minutos
   });
 
-  // Fetch all project activities
+  // Fetch all project activities - otimizado
   const { data: allActivities = [] } = useQuery({
     queryKey: ["all-project-activities", selectedCompanyId],
     queryFn: async () => {
       if (!selectedCompanyId) return [];
 
-      // Get all project IDs for this company
       const { data: projectIdsData, error: projectIdsError } = await supabase
         .from("projects")
         .select("id")
@@ -109,6 +107,7 @@ const Projects = () => {
       return data as ProjectActivity[];
     },
     enabled: !!selectedCompanyId,
+    staleTime: 1000 * 60, // 1 minuto
   });
 
   // Filter projects: exclude completed projects (status = 'concluido' or all activities done)

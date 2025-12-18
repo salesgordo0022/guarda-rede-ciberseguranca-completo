@@ -62,7 +62,7 @@ const Activities = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Fetch departments
+  // Fetch departments - com staleTime para evitar refetch
   const { data: departments = [] } = useQuery({
     queryKey: ['departments', selectedCompanyId],
     queryFn: async () => {
@@ -76,7 +76,8 @@ const Activities = () => {
 
       return data as Department[] || [];
     },
-    enabled: !!selectedCompanyId
+    enabled: !!selectedCompanyId,
+    staleTime: 1000 * 60 * 5, // 5 minutos
   });
 
   // Redirect to first department if none selected
@@ -151,7 +152,8 @@ const Activities = () => {
           }))
       }));
     },
-    enabled: !!departmentFilterId && !!selectedCompanyId
+    enabled: !!departmentFilterId && !!selectedCompanyId,
+    staleTime: 1000 * 60, // 1 minuto para atividades (dados mais dinâmicos)
   });
 
   // Calculate metrics from all activities

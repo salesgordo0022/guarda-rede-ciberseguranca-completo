@@ -98,8 +98,8 @@ export function useGlobalMetrics() {
       return { activities: allActivities, metrics };
     },
     enabled: !!selectedCompanyId && !!profile,
-    refetchOnMount: 'always',
-    staleTime: 0,
+    staleTime: 1000 * 60 * 2, // 2 minutos
+    refetchOnMount: true,
   });
 
   return {
