@@ -138,9 +138,13 @@ const ProjectDetail = () => {
       console.log('Toggle member mutation:', { userId, isAdding, projectId });
       
       if (isAdding) {
+        // Use upsert to avoid duplicate key errors
         const { error } = await supabase
           .from('project_members')
-          .insert({ project_id: projectId!, user_id: userId });
+          .upsert(
+            { project_id: projectId!, user_id: userId },
+            { onConflict: 'project_id,user_id', ignoreDuplicates: true }
+          );
         if (error) {
           console.error('Error adding member:', error);
           throw error;
