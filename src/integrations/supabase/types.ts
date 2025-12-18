@@ -262,13 +262,6 @@ export type Database = {
             foreignKeyName: "project_activities_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
-            referencedRelation: "project_indicators"
-            referencedColumns: ["project_id"]
-          },
-          {
-            foreignKeyName: "project_activities_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
@@ -459,32 +452,25 @@ export type Database = {
       }
     }
     Views: {
-      project_indicators: {
-        Row: {
-          beat_goal_count: number | null
-          company_id: string | null
-          completed_count: number | null
-          completed_late_count: number | null
-          completed_on_time_count: number | null
-          late_count: number | null
-          on_time_count: number | null
-          progress: number | null
-          project_id: string | null
-          project_name: string | null
-          total_activities: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "projects_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
+      [_ in never]: never
     }
     Functions: {
+      get_project_indicators_for_user: {
+        Args: never
+        Returns: {
+          beat_goal_count: number
+          company_id: string
+          completed_count: number
+          completed_late_count: number
+          completed_on_time_count: number
+          late_count: number
+          on_time_count: number
+          progress: number
+          project_id: string
+          project_name: string
+          total_activities: number
+        }[]
+      }
       get_user_company_role: {
         Args: { _company_id: string; _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
