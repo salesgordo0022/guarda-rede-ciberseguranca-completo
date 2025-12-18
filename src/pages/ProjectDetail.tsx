@@ -138,13 +138,26 @@ const ProjectDetail = () => {
       console.log('Toggle member mutation:', { userId, isAdding, projectId });
       
       if (isAdding) {
-        // Use upsert to avoid duplicate key errors
+        // Evita erro de chave duplicada verificando antes de inserir
+        const { data: existingMember, error: checkError } = await supabase
+          .from('project_members')
+          .select('id')
+          .eq('project_id', projectId!)
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (checkError) {
+          console.error('Error checking existing member:', checkError);
+          throw checkError;
+        }
+
+        // Já é membro, não faz nada
+        if (existingMember) return;
+
         const { error } = await supabase
           .from('project_members')
-          .upsert(
-            { project_id: projectId!, user_id: userId },
-            { onConflict: 'project_id,user_id', ignoreDuplicates: true }
-          );
+          .insert({ project_id: projectId!, user_id: userId });
+
         if (error) {
           console.error('Error adding member:', error);
           throw error;
@@ -155,14 +168,14 @@ const ProjectDetail = () => {
           .select('id')
           .eq('project_id', projectId!)
           .eq('user_id', userId)
-          .single();
-        
+          .maybeSingle();
+
         console.log('Existing member check:', { existingMember, checkError });
-        
-        if (checkError && checkError.code !== 'PGRST116') {
+
+        if (checkError) {
           throw checkError;
         }
-        
+
         if (existingMember) {
           const { error } = await supabase
             .from('project_members')
