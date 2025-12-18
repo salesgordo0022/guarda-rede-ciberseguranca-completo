@@ -52,7 +52,7 @@ export function CreateProjectDialog({ open: controlledOpen, onOpenChange: setCon
 
     // Fetch team members from the company
     const { data: teamMembers = [] } = useQuery({
-        queryKey: ['team-members-for-project', selectedCompanyId],
+        queryKey: ['team-members-for-project', selectedCompanyId, profile?.id],
         queryFn: async () => {
             if (!selectedCompanyId) return [];
             
@@ -77,16 +77,16 @@ export function CreateProjectDialog({ open: controlledOpen, onOpenChange: setCon
             
             // Combine data - mostrar todos exceto o próprio usuário criador
             return (profiles || [])
-                .map(profile => {
-                    const companyUser = companyUsers.find(u => u.user_id === profile.id);
+                .map(userProfile => {
+                    const companyUser = companyUsers.find(u => u.user_id === userProfile.id);
                     return {
-                        ...profile,
+                        ...userProfile,
                         role: companyUser?.role || 'colaborador'
                     } as TeamMember;
                 })
                 .filter(member => member.id !== profile?.id);
         },
-        enabled: !!selectedCompanyId && open
+        enabled: !!selectedCompanyId && !!profile?.id && open
     });
 
     const handleToggleMember = (memberId: string) => {
