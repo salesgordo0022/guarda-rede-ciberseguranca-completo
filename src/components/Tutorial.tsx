@@ -20,8 +20,8 @@ interface TutorialStep {
 const tutorialSteps: TutorialStep[] = [
   {
     id: 1,
-    title: "Bem-vindo ao TaskFlow!",
-    content: "Este é um guia rápido para ajudá-lo a entender como usar o sistema de gerenciamento de tarefas. O TaskFlow é uma plataforma completa para gerenciar projetos, tarefas e equipes de trabalho."
+    title: "Bem-vindo ao Imperium Flow!",
+    content: "Este é um guia rápido para ajudá-lo a entender como usar o sistema de gerenciamento de tarefas. O Imperium Flow é uma plataforma completa para gerenciar projetos, tarefas e equipes de trabalho."
   },
   {
     id: 2,
@@ -66,12 +66,12 @@ const tutorialSteps: TutorialStep[] = [
   {
     id: 9,
     title: "Resumo do Sistema",
-    content: "O TaskFlow ajuda sua equipe a trabalhar de forma mais eficiente:\n\n• Organize tarefas por departamentos e projetos\n• Acompanhe prazos e metas em tempo real\n• Receba notificações importantes\n• Monitore o desempenho da equipe\n• Mantenha tudo documentado e centralizado"
+    content: "O Imperium Flow ajuda sua equipe a trabalhar de forma mais eficiente:\n\n• Organize tarefas por departamentos e projetos\n• Acompanhe prazos e metas em tempo real\n• Receba notificações importantes\n• Monitore o desempenho da equipe\n• Mantenha tudo documentado e centralizado"
   },
   {
     id: 10,
     title: "Concluído!",
-    content: "Você completou o tutorial básico. Agora você está pronto para usar o TaskFlow efetivamente!"
+    content: "Você completou o tutorial básico. Agora você está pronto para usar o Imperium Flow efetivamente!"
   }
 ];
 

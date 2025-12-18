@@ -139,7 +139,7 @@ export function AppSidebar() {
       <SidebarHeader className="p-6 space-y-6">
         <div className="flex items-center justify-center min-h-[40px]">
           <div className="text-2xl font-bold text-primary cursor-pointer hover-scale">
-            TaskFlow
+            Imperium Flow
           </div>
         </div>
 
