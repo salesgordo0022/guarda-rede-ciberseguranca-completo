@@ -274,6 +274,17 @@ export function ActivityDetailsSheet({
 
                 if (!isProject) {
                     await recordHistory(activityId, 'criou', undefined, undefined, 'Atividade criada');
+                    
+                    // Salvar checklist items criados localmente
+                    if (checklist.length > 0) {
+                        const checklistItems = checklist.map((item, index) => ({
+                            activity_id: activityId,
+                            title: item.title,
+                            completed: item.completed,
+                            order_index: index
+                        }));
+                        await supabase.from('department_activity_checklist').insert(checklistItems);
+                    }
                 }
 
                 toast.success("Atividade criada com sucesso!");
@@ -323,26 +334,45 @@ export function ActivityDetailsSheet({
 
     // Checklist handlers
     const addChecklistItem = async () => {
-        if (!newChecklistItem.trim() || !initialActivity?.id) return;
+        if (!newChecklistItem.trim()) return;
         
-        const { data, error } = await supabase
-            .from('department_activity_checklist')
-            .insert({
-                activity_id: initialActivity.id,
-                title: newChecklistItem,
-                order_index: checklist.length
-            })
-            .select()
-            .single();
+        // Se já existe a atividade, salva no banco
+        if (initialActivity?.id) {
+            const { data, error } = await supabase
+                .from('department_activity_checklist')
+                .insert({
+                    activity_id: initialActivity.id,
+                    title: newChecklistItem,
+                    order_index: checklist.length
+                })
+                .select()
+                .single();
 
-        if (!error && data) {
-            setChecklist([...checklist, data]);
+            if (!error && data) {
+                setChecklist([...checklist, data]);
+                setNewChecklistItem("");
+                await recordHistory(initialActivity.id, 'adicionou', 'checklist', undefined, newChecklistItem);
+            }
+        } else {
+            // Se não existe, adiciona localmente (será salvo ao criar a atividade)
+            const newItem: ChecklistItem = {
+                id: `temp-${Date.now()}`,
+                title: newChecklistItem,
+                completed: false,
+                order_index: checklist.length
+            };
+            setChecklist([...checklist, newItem]);
             setNewChecklistItem("");
-            await recordHistory(initialActivity.id, 'adicionou', 'checklist', undefined, newChecklistItem);
         }
     };
 
     const toggleChecklistItem = async (item: ChecklistItem) => {
+        // Se é item temporário, apenas atualiza localmente
+        if (item.id.startsWith('temp-')) {
+            setChecklist(checklist.map(c => c.id === item.id ? { ...c, completed: !c.completed } : c));
+            return;
+        }
+
         const { error } = await supabase
             .from('department_activity_checklist')
             .update({ completed: !item.completed })
@@ -354,6 +384,12 @@ export function ActivityDetailsSheet({
     };
 
     const deleteChecklistItem = async (itemId: string) => {
+        // Se é item temporário, apenas remove localmente
+        if (itemId.startsWith('temp-')) {
+            setChecklist(checklist.filter(c => c.id !== itemId));
+            return;
+        }
+
         const { error } = await supabase
             .from('department_activity_checklist')
             .delete()
@@ -618,67 +654,59 @@ export function ActivityDetailsSheet({
                                         <ListChecks className="h-4 w-4" />
                                         Checklist - Passos da Atividade
                                     </div>
-                                    {!initialActivity?.id ? (
-                                        <p className="text-sm text-muted-foreground text-center py-4 bg-muted/30 rounded-lg">
-                                            Salve a atividade primeiro para adicionar itens ao checklist
-                                        </p>
-                                    ) : (
-                                        <>
-                                            <div className="flex gap-2">
-                                                <Input
-                                                    value={newChecklistItem}
-                                                    onChange={(e) => setNewChecklistItem(e.target.value)}
-                                                    placeholder="Adicionar novo passo..."
-                                                    onKeyDown={(e) => e.key === 'Enter' && addChecklistItem()}
-                                                />
-                                                <Button onClick={addChecklistItem} size="icon" variant="outline">
-                                                    <Plus className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                            <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                                                {checklist.length === 0 ? (
-                                                    <p className="text-sm text-muted-foreground text-center py-4">
-                                                        Nenhum passo adicionado
-                                                    </p>
-                                                ) : (
-                                                    checklist.map((item) => (
-                                                        <div key={item.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 group">
-                                                            <Checkbox
-                                                                checked={item.completed}
-                                                                onCheckedChange={() => toggleChecklistItem(item)}
-                                                            />
-                                                            <span className={`flex-1 text-sm ${item.completed ? 'line-through text-muted-foreground' : ''}`}>
-                                                                {item.title}
-                                                            </span>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-8 w-8 opacity-0 group-hover:opacity-100"
-                                                                onClick={() => deleteChecklistItem(item.id)}
-                                                            >
-                                                                <Trash2 className="h-4 w-4 text-destructive" />
-                                                            </Button>
-                                                        </div>
-                                                    ))
-                                                )}
-                                            </div>
-                                            {checklist.length > 0 && (
-                                                <div className="pt-2">
-                                                    <div className="flex items-center justify-between text-sm mb-1">
-                                                        <span className="text-muted-foreground">Progresso do Checklist</span>
-                                                        <span className="font-medium">
-                                                            {Math.round((checklist.filter(c => c.completed).length / checklist.length) * 100)}%
-                                                        </span>
-                                                    </div>
-                                                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                                                        <div 
-                                                            className="h-full bg-primary transition-all"
-                                                            style={{ width: `${(checklist.filter(c => c.completed).length / checklist.length) * 100}%` }}
-                                                        />
-                                                    </div>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            value={newChecklistItem}
+                                            onChange={(e) => setNewChecklistItem(e.target.value)}
+                                            placeholder="Adicionar novo passo..."
+                                            onKeyDown={(e) => e.key === 'Enter' && addChecklistItem()}
+                                        />
+                                        <Button onClick={addChecklistItem} size="icon" variant="outline">
+                                            <Plus className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                    <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                                        {checklist.length === 0 ? (
+                                            <p className="text-sm text-muted-foreground text-center py-4">
+                                                Nenhum passo adicionado
+                                            </p>
+                                        ) : (
+                                            checklist.map((item) => (
+                                                <div key={item.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 group">
+                                                    <Checkbox
+                                                        checked={item.completed}
+                                                        onCheckedChange={() => toggleChecklistItem(item)}
+                                                    />
+                                                    <span className={`flex-1 text-sm ${item.completed ? 'line-through text-muted-foreground' : ''}`}>
+                                                        {item.title}
+                                                    </span>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 opacity-0 group-hover:opacity-100"
+                                                        onClick={() => deleteChecklistItem(item.id)}
+                                                    >
+                                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                                    </Button>
                                                 </div>
-                                            )}
-                                        </>
+                                            ))
+                                        )}
+                                    </div>
+                                    {checklist.length > 0 && (
+                                        <div className="pt-2">
+                                            <div className="flex items-center justify-between text-sm mb-1">
+                                                <span className="text-muted-foreground">Progresso do Checklist</span>
+                                                <span className="font-medium">
+                                                    {Math.round((checklist.filter(c => c.completed).length / checklist.length) * 100)}%
+                                                </span>
+                                            </div>
+                                            <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                                <div 
+                                                    className="h-full bg-primary transition-all"
+                                                    style={{ width: `${(checklist.filter(c => c.completed).length / checklist.length) * 100}%` }}
+                                                />
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
                             </>
