@@ -40,18 +40,37 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { email, fullName, companyId, role, departmentIds, password } = await req.json();
+    const { email, fullName, companyIds, role, departmentIds, password } = await req.json();
 
-    console.log("Creating user:", { email, fullName, companyId, role });
+    // Support both single companyId and multiple companyIds
+    const companies: string[] = companyIds || [];
+    
+    if (companies.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "Selecione pelo menos uma empresa" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    const { data: userCompany } = await supabaseAdmin
-      .from("user_companies")
-      .select("role")
-      .eq("user_id", callingUser.id)
-      .eq("company_id", companyId)
-      .single();
+    console.log("Creating user:", { email, fullName, companies, role });
 
-    if (!userCompany || userCompany.role !== "admin") {
+    // Verify the calling user is an admin in at least one of the companies
+    let isAdminInAnyCompany = false;
+    for (const companyId of companies) {
+      const { data: userCompany } = await supabaseAdmin
+        .from("user_companies")
+        .select("role")
+        .eq("user_id", callingUser.id)
+        .eq("company_id", companyId)
+        .single();
+
+      if (userCompany?.role === "admin") {
+        isAdminInAnyCompany = true;
+        break;
+      }
+    }
+
+    if (!isAdminInAnyCompany) {
       return new Response(
         JSON.stringify({ error: "Only admins can create team members" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -64,22 +83,25 @@ Deno.serve(async (req) => {
     let userId: string;
 
     if (existingUser) {
-      const { data: existingCompanyLink } = await supabaseAdmin
-        .from("user_companies")
-        .select("id")
-        .eq("user_id", existingUser.id)
-        .eq("company_id", companyId)
-        .single();
+      // Check if user already exists in any of the selected companies
+      for (const companyId of companies) {
+        const { data: existingCompanyLink } = await supabaseAdmin
+          .from("user_companies")
+          .select("id")
+          .eq("user_id", existingUser.id)
+          .eq("company_id", companyId)
+          .single();
 
-      if (existingCompanyLink) {
-        return new Response(
-          JSON.stringify({ error: "Este usuário já faz parte desta empresa" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        if (existingCompanyLink) {
+          return new Response(
+            JSON.stringify({ error: `Este usuário já faz parte de uma das empresas selecionadas` }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
       }
 
       userId = existingUser.id;
-      console.log("User exists, adding to company:", userId);
+      console.log("User exists, adding to companies:", userId);
     } else {
       // Use the password provided by admin or generate a temporary one
       const userPassword = password || Math.random().toString(36).slice(-12) + "A1!";
@@ -112,21 +134,19 @@ Deno.serve(async (req) => {
       console.log("New user created:", userId);
     }
 
-    // Add user to company with the specified role
-    const { error: companyError } = await supabaseAdmin
-      .from("user_companies")
-      .insert({
-        user_id: userId,
-        company_id: companyId,
-        role: role,
-      });
+    // Add user to all selected companies with the specified role
+    for (const companyId of companies) {
+      const { error: companyError } = await supabaseAdmin
+        .from("user_companies")
+        .insert({
+          user_id: userId,
+          company_id: companyId,
+          role: role,
+        });
 
-    if (companyError) {
-      console.error("Failed to add user to company:", companyError);
-      return new Response(
-        JSON.stringify({ error: "Falha ao adicionar usuário à empresa: " + companyError.message }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      if (companyError) {
+        console.error("Failed to add user to company:", companyId, companyError);
+      }
     }
 
     // Add user to departments

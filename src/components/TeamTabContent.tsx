@@ -123,6 +123,7 @@ export const TeamTabContent = () => {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editDialogOpen, setEditDialogOpen] = useState(false);
     const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
+    const [selectedCompanies, setSelectedCompanies] = useState<string[]>([]);
     const [editDepartments, setEditDepartments] = useState<string[]>([]);
     const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
 
@@ -137,6 +138,35 @@ export const TeamTabContent = () => {
             department_ids: [],
             role: "colaborador",
         },
+    });
+
+    // Buscar todas as empresas que o admin tem acesso
+    const { data: companies } = useQuery({
+        queryKey: ["all-companies"],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from("companies")
+                .select("id, name")
+                .order("name");
+            if (error) throw error;
+            return data;
+        },
+    });
+
+    // Buscar departamentos de todas as empresas selecionadas
+    const { data: allDepartments } = useQuery({
+        queryKey: ["all-departments-for-companies", selectedCompanies],
+        queryFn: async () => {
+            if (selectedCompanies.length === 0) return [];
+            const { data, error } = await supabase
+                .from("departments")
+                .select("id, name, company_id, companies:company_id(name)")
+                .in("company_id", selectedCompanies)
+                .order("name");
+            if (error) throw error;
+            return data;
+        },
+        enabled: selectedCompanies.length > 0,
     });
 
     // Form para editar
@@ -240,7 +270,7 @@ export const TeamTabContent = () => {
     // Mutation para criar usuário via Edge Function
     const createUserMutation = useMutation({
         mutationFn: async (values: z.infer<typeof createUserSchema>) => {
-            if (!selectedCompanyId) throw new Error("Nenhuma empresa selecionada");
+            if (selectedCompanies.length === 0) throw new Error("Selecione pelo menos uma empresa");
 
             const { data: sessionData } = await supabase.auth.getSession();
             if (!sessionData.session) throw new Error("Usuário não autenticado");
@@ -249,7 +279,7 @@ export const TeamTabContent = () => {
                 body: {
                     email: values.email,
                     fullName: `${values.firstName} ${values.lastName}`,
-                    companyId: selectedCompanyId,
+                    companyIds: selectedCompanies,
                     role: values.role,
                     departmentIds: selectedDepartments,
                     password: values.password,
@@ -275,6 +305,7 @@ export const TeamTabContent = () => {
             setDialogOpen(false);
             form.reset();
             setSelectedDepartments([]);
+            setSelectedCompanies([]);
         },
         onError: (error: any) => {
             toast({
@@ -340,6 +371,22 @@ export const TeamTabContent = () => {
 
     const onEditSubmit = (values: z.infer<typeof editUserSchema>) => {
         updateUserMutation.mutate(values);
+    };
+
+    const handleCompanyToggle = (companyId: string) => {
+        setSelectedCompanies(prev => {
+            const newSelection = prev.includes(companyId) 
+                ? prev.filter(id => id !== companyId)
+                : [...prev, companyId];
+            
+            // Limpar departamentos que não pertencem às empresas selecionadas
+            if (!newSelection.includes(companyId)) {
+                const deptsToRemove = allDepartments?.filter(d => d.company_id === companyId).map(d => d.id) || [];
+                setSelectedDepartments(prevDepts => prevDepts.filter(id => !deptsToRemove.includes(id)));
+            }
+            
+            return newSelection;
+        });
     };
 
     const handleDepartmentToggle = (deptId: string) => {
@@ -491,33 +538,64 @@ export const TeamTabContent = () => {
                                 />
 
                                 <FormItem>
-                                    <FormLabel>Departamentos</FormLabel>
+                                    <FormLabel>Empresas</FormLabel>
                                     <FormDescription>
-                                        Selecione um ou mais departamentos para o usuário
+                                        Selecione uma ou mais empresas para o usuário
                                     </FormDescription>
-                                    <div className="grid grid-cols-2 gap-2 mt-2 max-h-40 overflow-y-auto border rounded-md p-3">
-                                        {departments?.map((dept) => (
-                                            <div key={dept.id} className="flex items-center space-x-2">
+                                    <div className="grid grid-cols-1 gap-2 mt-2 max-h-32 overflow-y-auto border rounded-md p-3">
+                                        {companies?.map((company) => (
+                                            <div key={company.id} className="flex items-center space-x-2">
                                                 <Checkbox
-                                                    id={`dept-${dept.id}`}
-                                                    checked={selectedDepartments.includes(dept.id)}
-                                                    onCheckedChange={() => handleDepartmentToggle(dept.id)}
+                                                    id={`company-${company.id}`}
+                                                    checked={selectedCompanies.includes(company.id)}
+                                                    onCheckedChange={() => handleCompanyToggle(company.id)}
                                                 />
                                                 <label
-                                                    htmlFor={`dept-${dept.id}`}
+                                                    htmlFor={`company-${company.id}`}
                                                     className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                                                 >
-                                                    {dept.name}
+                                                    {company.name}
                                                 </label>
                                             </div>
                                         ))}
-                                        {(!departments || departments.length === 0) && (
-                                            <p className="text-sm text-muted-foreground col-span-2">
-                                                Nenhum departamento cadastrado
+                                        {(!companies || companies.length === 0) && (
+                                            <p className="text-sm text-muted-foreground">
+                                                Nenhuma empresa cadastrada
                                             </p>
                                         )}
                                     </div>
                                 </FormItem>
+
+                                {selectedCompanies.length > 0 && (
+                                    <FormItem>
+                                        <FormLabel>Departamentos</FormLabel>
+                                        <FormDescription>
+                                            Selecione um ou mais departamentos para o usuário
+                                        </FormDescription>
+                                        <div className="grid grid-cols-1 gap-2 mt-2 max-h-40 overflow-y-auto border rounded-md p-3">
+                                            {allDepartments?.map((dept) => (
+                                                <div key={dept.id} className="flex items-center space-x-2">
+                                                    <Checkbox
+                                                        id={`dept-${dept.id}`}
+                                                        checked={selectedDepartments.includes(dept.id)}
+                                                        onCheckedChange={() => handleDepartmentToggle(dept.id)}
+                                                    />
+                                                    <label
+                                                        htmlFor={`dept-${dept.id}`}
+                                                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                                                    >
+                                                        {dept.name} <span className="text-xs text-muted-foreground">({(dept.companies as any)?.name})</span>
+                                                    </label>
+                                                </div>
+                                            ))}
+                                            {(!allDepartments || allDepartments.length === 0) && (
+                                                <p className="text-sm text-muted-foreground">
+                                                    Nenhum departamento nas empresas selecionadas
+                                                </p>
+                                            )}
+                                        </div>
+                                    </FormItem>
+                                )}
 
                                 <FormField
                                     control={form.control}
