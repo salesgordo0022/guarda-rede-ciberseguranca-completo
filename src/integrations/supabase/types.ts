@@ -948,6 +948,10 @@ export type Database = {
         Args: { _company_id: string; _user_id: string }
         Returns: undefined
       }
+      sanitize_for_notification: {
+        Args: { input_text: string }
+        Returns: string
+      }
       user_belongs_to_company: {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
