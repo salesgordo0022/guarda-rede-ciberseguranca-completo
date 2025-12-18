@@ -135,31 +135,79 @@ const ProjectDetail = () => {
   // Mutation to toggle project member
   const toggleMemberMutation = useMutation({
     mutationFn: async ({ userId, isAdding }: { userId: string; isAdding: boolean }) => {
+      console.log('Toggle member mutation:', { userId, isAdding, projectId });
+      
       if (isAdding) {
         const { error } = await supabase
           .from('project_members')
           .insert({ project_id: projectId!, user_id: userId });
-        if (error) throw error;
+        if (error) {
+          console.error('Error adding member:', error);
+          throw error;
+        }
       } else {
-        const { error } = await supabase
+        const { data: existingMember, error: checkError } = await supabase
           .from('project_members')
-          .delete()
+          .select('id')
           .eq('project_id', projectId!)
-          .eq('user_id', userId);
-        if (error) throw error;
+          .eq('user_id', userId)
+          .single();
+        
+        console.log('Existing member check:', { existingMember, checkError });
+        
+        if (checkError && checkError.code !== 'PGRST116') {
+          throw checkError;
+        }
+        
+        if (existingMember) {
+          const { error } = await supabase
+            .from('project_members')
+            .delete()
+            .eq('project_id', projectId!)
+            .eq('user_id', userId);
+          if (error) {
+            console.error('Error removing member:', error);
+            throw error;
+          }
+        }
       }
     },
+    onMutate: async ({ userId, isAdding }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['project-members', projectId] });
+      
+      // Snapshot the previous value
+      const previousMembers = queryClient.getQueryData<string[]>(['project-members', projectId]);
+      
+      // Optimistically update
+      queryClient.setQueryData<string[]>(['project-members', projectId], (old = []) => {
+        if (isAdding) {
+          return [...old, userId];
+        } else {
+          return old.filter(id => id !== userId);
+        }
+      });
+      
+      return { previousMembers };
+    },
+    onError: (error, _, context) => {
+      // Rollback on error
+      queryClient.setQueryData(['project-members', projectId], context?.previousMembers);
+      toast.error('Erro ao atualizar membros: ' + (error as Error).message);
+    },
     onSuccess: (_, { isAdding }) => {
-      queryClient.invalidateQueries({ queryKey: ['project-members', projectId] });
       toast.success(isAdding ? 'Membro adicionado ao projeto!' : 'Membro removido do projeto!');
     },
-    onError: (error) => {
-      toast.error('Erro ao atualizar membros: ' + (error as Error).message);
+    onSettled: () => {
+      // Always refetch after mutation
+      queryClient.invalidateQueries({ queryKey: ['project-members', projectId] });
     }
   });
 
   const handleToggleMember = (userId: string) => {
+    if (toggleMemberMutation.isPending) return; // Prevent double clicks
     const isCurrentlyMember = projectMembers.includes(userId);
+    console.log('Handle toggle member:', { userId, isCurrentlyMember });
     toggleMemberMutation.mutate({ userId, isAdding: !isCurrentlyMember });
   };
 
@@ -514,10 +562,13 @@ const ProjectDetail = () => {
                   <div className="space-y-2">
                     {companyUsers.map((user) => {
                       const isMember = projectMembers.includes(user.id);
+                      const isPending = toggleMemberMutation.isPending;
                       return (
                         <div
                           key={user.id}
-                          className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
+                          className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
+                            isPending ? 'opacity-50 cursor-wait' : 'cursor-pointer'
+                          } ${
                             isMember ? 'bg-primary/10 border-primary' : 'hover:bg-muted'
                           }`}
                           onClick={() => handleToggleMember(user.id)}
