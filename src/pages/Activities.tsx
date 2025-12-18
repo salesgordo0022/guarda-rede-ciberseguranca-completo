@@ -8,7 +8,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, AlertCircle } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Plus, AlertCircle, List, GitBranch } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -18,6 +19,7 @@ import { Database } from "@/integrations/supabase/types";
 
 import { ActivityTable } from "@/components/ActivityTable";
 import { ActivityDetailsSheet } from "@/components/ActivityDetailsSheet";
+import { ProcessFlowDiagram } from "@/components/ProcessFlowDiagram";
 
 type ActivityStatus = Database['public']['Enums']['activity_status'];
 
@@ -309,23 +311,49 @@ const Activities = () => {
         </Button>
       </div>
 
-      <Card className="border-none shadow-md bg-card/50 backdrop-blur-sm">
-        <CardContent className="p-0">
-          <ActivityTable
-            activities={activities}
-            isLoading={isLoading}
-            onStatusChange={handleStatusChange}
-            onEdit={(isAdmin || isGestor) ? handleEdit : undefined}
-            onDelete={(isAdmin || isGestor) ? handleDelete : undefined}
-            onComplete={(id) => completeMutation.mutate(id)}
-            showActions={true}
-            emptyMessage="Nenhuma atividade encontrada."
-            currentUserId={profile?.id}
-            isAdmin={isAdmin}
-            onView={(activity) => setViewing(activity)}
-          />
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="list" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="list" className="gap-2">
+            <List className="h-4 w-4" />
+            Lista
+          </TabsTrigger>
+          <TabsTrigger value="process" className="gap-2">
+            <GitBranch className="h-4 w-4" />
+            Processo
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="list">
+          <Card className="border-none shadow-md bg-card/50 backdrop-blur-sm">
+            <CardContent className="p-0">
+              <ActivityTable
+                activities={activities}
+                isLoading={isLoading}
+                onStatusChange={handleStatusChange}
+                onEdit={(isAdmin || isGestor) ? handleEdit : undefined}
+                onDelete={(isAdmin || isGestor) ? handleDelete : undefined}
+                onComplete={(id) => completeMutation.mutate(id)}
+                showActions={true}
+                emptyMessage="Nenhuma atividade encontrada."
+                currentUserId={profile?.id}
+                isAdmin={isAdmin}
+                onView={(activity) => setViewing(activity)}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="process">
+          <Card className="border-none shadow-md bg-card/50 backdrop-blur-sm">
+            <CardContent className="p-6">
+              <ProcessFlowDiagram 
+                activities={activities}
+                onActivityClick={(activity) => setViewing(activity)}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <ActivityDetailsSheet
         activity={viewing}
