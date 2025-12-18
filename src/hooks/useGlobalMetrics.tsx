@@ -27,7 +27,7 @@ export function useGlobalMetrics() {
   const { selectedCompanyId, profile } = useAuth();
 
   // Buscar todas as atividades (projetos + departamentos)
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ['global-activities', selectedCompanyId],
     queryFn: async () => {
       if (!selectedCompanyId) return { activities: [], metrics: null };
@@ -96,6 +96,8 @@ export function useGlobalMetrics() {
       return { activities: allActivities, metrics };
     },
     enabled: !!selectedCompanyId && !!profile,
+    refetchOnMount: 'always',
+    staleTime: 0,
   });
 
   return {
