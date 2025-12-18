@@ -501,7 +501,7 @@ const ProjectDetail = () => {
             <Search className="h-4 w-4" />
             Atividades
           </TabsTrigger>
-          {isAdmin && (
+          {(isAdmin || isGestor) && (
             <TabsTrigger value="team" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               Equipe ({projectMembers.length})
@@ -560,7 +560,7 @@ const ProjectDetail = () => {
           </Card>
         </TabsContent>
 
-        {isAdmin && (
+        {(isAdmin || isGestor) && (
           <TabsContent value="team" className="space-y-4">
             <div>
               <h2 className="text-2xl font-bold">Equipe do Projeto</h2>
