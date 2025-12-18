@@ -5,7 +5,7 @@ import {
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,6 +34,7 @@ import {
     BookOpen,
     Flag,
     Send,
+    Users,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -74,6 +75,13 @@ interface Note {
     created_at: string;
 }
 
+interface TeamMember {
+    id: string;
+    full_name: string;
+    email: string;
+    avatar_url: string | null;
+}
+
 interface ActivityDetailsSheetProps {
     activity: any | null;
     open: boolean;
@@ -106,6 +114,9 @@ export function ActivityDetailsSheet({
         department_id: preselectedDepartmentId || ""
     });
 
+    // Assignees State
+    const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
+
     // Fetch departments for selection
     const { data: departments } = useQuery({
         queryKey: ['departments-for-activity', selectedCompanyId],
@@ -118,6 +129,31 @@ export function ActivityDetailsSheet({
             return data || [];
         },
         enabled: open && !!selectedCompanyId && mode === 'create' && !preselectedDepartmentId && !preselectedProjectId
+    });
+
+    // Fetch team members from the company
+    const { data: teamMembers = [] } = useQuery({
+        queryKey: ['team-members-for-activity', selectedCompanyId],
+        queryFn: async () => {
+            if (!selectedCompanyId) return [];
+            
+            const { data: userCompanies } = await supabase
+                .from('user_companies')
+                .select('user_id')
+                .eq('company_id', selectedCompanyId);
+            
+            if (!userCompanies || userCompanies.length === 0) return [];
+            
+            const userIds = userCompanies.map(uc => uc.user_id);
+            
+            const { data: profiles } = await supabase
+                .from('profiles')
+                .select('id, full_name, email, avatar_url')
+                .in('id', userIds);
+            
+            return (profiles || []) as TeamMember[];
+        },
+        enabled: !!selectedCompanyId && open
     });
 
     // Checklist State
@@ -162,33 +198,48 @@ export function ActivityDetailsSheet({
     const fetchActivityData = async () => {
         if (!initialActivity?.id) return;
 
-        const { data: checklistData } = await supabase
-            .from('department_activity_checklist')
-            .select('*')
-            .eq('activity_id', initialActivity.id)
-            .order('order_index');
-        if (checklistData) setChecklist(checklistData);
+        const isProject = !initialActivity.department_id;
+        const assigneesTable = isProject ? 'project_activity_assignees' : 'department_activity_assignees';
 
-        const { data: commentsData } = await supabase
-            .from('department_activity_comments')
-            .select('*')
-            .eq('activity_id', initialActivity.id)
-            .order('created_at', { ascending: false });
-        if (commentsData) setComments(commentsData);
+        // Fetch assignees
+        const { data: assigneesData } = await supabase
+            .from(assigneesTable)
+            .select('user_id')
+            .eq('activity_id', initialActivity.id);
+        if (assigneesData) {
+            setSelectedAssignees(assigneesData.map(a => a.user_id));
+        }
 
-        const { data: historyData } = await supabase
-            .from('department_activity_history')
-            .select('*')
-            .eq('activity_id', initialActivity.id)
-            .order('created_at', { ascending: false });
-        if (historyData) setHistory(historyData);
+        // Only fetch these for department activities
+        if (!isProject) {
+            const { data: checklistData } = await supabase
+                .from('department_activity_checklist')
+                .select('*')
+                .eq('activity_id', initialActivity.id)
+                .order('order_index');
+            if (checklistData) setChecklist(checklistData);
 
-        const { data: notesData } = await supabase
-            .from('department_activity_notes')
-            .select('*')
-            .eq('activity_id', initialActivity.id)
-            .order('created_at', { ascending: false });
-        if (notesData) setNotes(notesData);
+            const { data: commentsData } = await supabase
+                .from('department_activity_comments')
+                .select('*')
+                .eq('activity_id', initialActivity.id)
+                .order('created_at', { ascending: false });
+            if (commentsData) setComments(commentsData);
+
+            const { data: historyData } = await supabase
+                .from('department_activity_history')
+                .select('*')
+                .eq('activity_id', initialActivity.id)
+                .order('created_at', { ascending: false });
+            if (historyData) setHistory(historyData);
+
+            const { data: notesData } = await supabase
+                .from('department_activity_notes')
+                .select('*')
+                .eq('activity_id', initialActivity.id)
+                .order('created_at', { ascending: false });
+            if (notesData) setNotes(notesData);
+        }
     };
 
     // Initialize/Reset Form
@@ -204,6 +255,7 @@ export function ActivityDetailsSheet({
                     priority: initialActivity.priority || "media",
                     department_id: initialActivity.department_id || ""
                 });
+                // Assignees serão carregados pelo fetchActivityData
             } else {
                 setFormData({
                     name: "",
@@ -214,6 +266,7 @@ export function ActivityDetailsSheet({
                     priority: "media",
                     department_id: preselectedDepartmentId || ""
                 });
+                setSelectedAssignees([]);
                 setChecklist([]);
                 setComments([]);
                 setHistory([]);
@@ -221,6 +274,14 @@ export function ActivityDetailsSheet({
             }
         }
     }, [open, mode, initialActivity]);
+
+    const toggleAssignee = (userId: string) => {
+        setSelectedAssignees(prev => 
+            prev.includes(userId) 
+                ? prev.filter(id => id !== userId)
+                : [...prev, userId]
+        );
+    };
 
     const recordHistory = async (activityId: string, action: string, fieldName?: string, oldValue?: string, newValue?: string) => {
         await supabase.from('department_activity_history').insert({
@@ -288,6 +349,16 @@ export function ActivityDetailsSheet({
                     }
                 }
 
+                // Salvar responsáveis (assignees)
+                const assigneesTable = isProject ? 'project_activity_assignees' : 'department_activity_assignees';
+                if (selectedAssignees.length > 0) {
+                    const assigneesData = selectedAssignees.map(userId => ({
+                        activity_id: activityId,
+                        user_id: userId
+                    }));
+                    await supabase.from(assigneesTable).insert(assigneesData);
+                }
+
                 toast.success("Atividade criada com sucesso!");
             } else {
                 if (!isProject && initialActivity) {
@@ -348,6 +419,19 @@ export function ActivityDetailsSheet({
                     .eq('id', activityId);
 
                 if (error) throw error;
+
+                // Atualizar responsáveis (delete and re-insert)
+                const assigneesTable = isProject ? 'project_activity_assignees' : 'department_activity_assignees';
+                await supabase.from(assigneesTable).delete().eq('activity_id', activityId!);
+                
+                if (selectedAssignees.length > 0) {
+                    const assigneesData = selectedAssignees.map(userId => ({
+                        activity_id: activityId,
+                        user_id: userId
+                    }));
+                    await supabase.from(assigneesTable).insert(assigneesData);
+                }
+
                 toast.success("Atividade atualizada com sucesso!");
             }
 
@@ -662,6 +746,48 @@ export function ActivityDetailsSheet({
                                     )}
                                 </InputWrapper>
                             )}
+
+                            {/* Assignees Section */}
+                            <div className="grid grid-cols-[140px_1fr] items-start gap-4">
+                                <div className="flex items-center gap-2 text-muted-foreground text-sm font-medium pt-2">
+                                    <Users className="h-4 w-4" />
+                                    Responsáveis
+                                </div>
+                                <div className="space-y-2">
+                                    <div className="border rounded-lg p-2 max-h-40 overflow-y-auto space-y-1">
+                                        {teamMembers.length === 0 ? (
+                                            <p className="text-sm text-muted-foreground text-center py-2">
+                                                Nenhum membro encontrado
+                                            </p>
+                                        ) : (
+                                            teamMembers.map((member) => (
+                                                <div
+                                                    key={member.id}
+                                                    className="flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer"
+                                                    onClick={() => toggleAssignee(member.id)}
+                                                >
+                                                    <Checkbox
+                                                        checked={selectedAssignees.includes(member.id)}
+                                                        onCheckedChange={() => toggleAssignee(member.id)}
+                                                    />
+                                                    <Avatar className="h-6 w-6">
+                                                        <AvatarImage src={member.avatar_url || undefined} />
+                                                        <AvatarFallback className="text-xs bg-primary text-primary-foreground">
+                                                            {member.full_name?.substring(0, 2).toUpperCase() || 'US'}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                    <span className="text-sm truncate">{member.full_name}</span>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                    {selectedAssignees.length > 0 && (
+                                        <p className="text-xs text-muted-foreground">
+                                            {selectedAssignees.length} responsável(eis) selecionado(s)
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
 
                             <InputWrapper icon={Target} label="Meta">
                                 <div className="flex items-center gap-2">
