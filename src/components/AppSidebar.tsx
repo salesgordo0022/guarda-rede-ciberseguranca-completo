@@ -282,11 +282,6 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="p-4 space-y-2 mt-auto">
-        <button className="flex items-center gap-3 px-4 py-3 rounded-lg transition-all bg-[hsl(194,100%,8%)] text-white hover:bg-[hsl(194,100%,12%)] hover-scale w-full">
-          <HelpCircle className="h-5 w-5 flex-shrink-0" />
-          {open && <span className="text-[15px]">Ajuda</span>}
-        </button>
-
         <button onClick={handleLogout} className="flex items-center gap-3 px-4 py-3 rounded-lg transition-all hover:bg-sidebar-accent hover-scale w-full text-sidebar-foreground">
           <LogOut className="h-5 w-5 flex-shrink-0" />
           {open && <span className="text-[15px]">Sair</span>}
@@ -306,7 +301,7 @@ export function AppSidebar() {
           href="https://appp.gclick.com.br/autenticacao" 
           target="_blank" 
           rel="noopener noreferrer"
-          className="flex items-center gap-3 px-4 py-3 rounded-lg transition-all bg-sidebar-accent text-sidebar-foreground hover:bg-sidebar-accent/80 hover-scale w-full"
+          className="flex items-center gap-3 px-4 py-3 rounded-lg transition-all bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 hover-scale w-full"
         >
           <Building2 className="h-5 w-5 flex-shrink-0" />
           {open && <span className="text-[15px] font-medium">Gclick</span>}
