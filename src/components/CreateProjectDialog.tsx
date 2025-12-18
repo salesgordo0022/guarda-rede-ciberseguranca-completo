@@ -75,7 +75,7 @@ export function CreateProjectDialog({ open: controlledOpen, onOpenChange: setCon
             
             if (profilesError) throw profilesError;
             
-            // Combine data, excluding admins (they see all projects anyway)
+            // Combine data - mostrar todos exceto o próprio usuário criador
             return (profiles || [])
                 .map(profile => {
                     const companyUser = companyUsers.find(u => u.user_id === profile.id);
@@ -84,7 +84,7 @@ export function CreateProjectDialog({ open: controlledOpen, onOpenChange: setCon
                         role: companyUser?.role || 'colaborador'
                     } as TeamMember;
                 })
-                .filter(member => member.role !== 'admin' && member.id !== profile?.id);
+                .filter(member => member.id !== profile?.id);
         },
         enabled: !!selectedCompanyId && open
     });
