@@ -13,7 +13,7 @@ import { Plus, AlertCircle, List, GitBranch } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { createNotification } from "@/hooks/useNotifications";
+import { notifyActivityStatusChanged } from "@/utils/notificationService";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Database } from "@/integrations/supabase/types";
@@ -256,20 +256,18 @@ const Activities = () => {
 
       if (error) throw error;
 
-      if (profile?.id) {
-        try {
-          await createNotification({
-            userId: profile.id,
-            title: 'Atividade concluída',
-            description: `Você concluiu "${updated.name}"`,
-            type: 'status_change',
-            activityId: updated.id,
-            departmentId: updated.department_id,
-            createdBy: profile.id,
-          });
-        } catch (e) {
-          console.error('Erro ao criar notificação de conclusão:', e);
-        }
+      // Notificar todos da empresa sobre atividade concluída
+      if (profile?.id && selectedCompanyId) {
+        await notifyActivityStatusChanged(
+          selectedCompanyId,
+          updated.name,
+          'em_andamento',
+          'concluida',
+          updated.id,
+          updated.department_id,
+          profile.full_name || 'Usuário',
+          profile.id
+        );
       }
 
       return updated;

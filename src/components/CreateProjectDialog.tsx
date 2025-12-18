@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
+import { notifyProjectCreated } from "@/utils/notificationService";
 
 interface CreateProjectDialogProps {
     open?: boolean;
@@ -38,16 +39,27 @@ export function CreateProjectDialog({ open: controlledOpen, onOpenChange: setCon
 
         setLoading(true);
         try {
-            const { error } = await supabase
+            const { data, error } = await supabase
                 .from("projects")
                 .insert({
                     name,
                     description: description || null,
                     company_id: selectedCompanyId,
                     created_by: profile.id,
-                });
+                })
+                .select()
+                .single();
 
             if (error) throw error;
+
+            // Notificar todos da empresa
+            await notifyProjectCreated(
+                selectedCompanyId,
+                name,
+                data.id,
+                profile.full_name || 'Usuário',
+                profile.id
+            );
 
             toast.success("Projeto criado com sucesso!");
             setOpen(false);
