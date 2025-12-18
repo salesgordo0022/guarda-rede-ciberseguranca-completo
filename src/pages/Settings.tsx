@@ -86,7 +86,8 @@ const Settings = () => {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
     const [deletingDepartment, setDeletingDepartment] = useState<Department | null>(null);
-    const { selectedCompanyId, isAdmin } = useAuth();
+    const { selectedCompanyId, isAdmin, isGestor } = useAuth();
+    const canManageTeam = isAdmin || isGestor; // Admin e Gestor podem gerenciar equipe e departamentos
 
     // Sistema de cores e tema
     const {
@@ -311,12 +312,12 @@ const Settings = () => {
             </div>
 
             <Tabs defaultValue="profile" className="w-full">
-                <TabsList className={`grid w-full max-w-3xl ${isAdmin ? 'grid-cols-3 md:grid-cols-5' : 'grid-cols-3'} h-auto`}>
+                <TabsList className={`grid w-full max-w-3xl ${canManageTeam ? 'grid-cols-3 md:grid-cols-5' : 'grid-cols-3'} h-auto`}>
                     <TabsTrigger value="profile" className="flex-col md:flex-row gap-1 py-2 text-xs md:text-sm">
                         <User className="h-4 w-4" />
                         <span className="hidden sm:inline">Perfil</span>
                     </TabsTrigger>
-                    {isAdmin && (
+                    {canManageTeam && (
                         <TabsTrigger value="departments" className="flex-col md:flex-row gap-1 py-2 text-xs md:text-sm">
                             <Building2 className="h-4 w-4" />
                             <span className="hidden sm:inline">Departamentos</span>
@@ -326,7 +327,7 @@ const Settings = () => {
                         <Palette className="h-4 w-4" />
                         <span className="hidden sm:inline">Aparência</span>
                     </TabsTrigger>
-                    {isAdmin && (
+                    {canManageTeam && (
                         <TabsTrigger value="team" className="flex-col md:flex-row gap-1 py-2 text-xs md:text-sm">
                             <Users className="h-4 w-4" />
                             <span className="hidden sm:inline">Equipe</span>
@@ -344,7 +345,7 @@ const Settings = () => {
                 </TabsContent>
 
                 {/* Tab de Departamentos */}
-                {isAdmin && (
+                {canManageTeam && (
                 <TabsContent value="departments" className="space-y-4">
                     <div className="flex items-center justify-between">
                         <div>
@@ -727,7 +728,7 @@ const Settings = () => {
                     </Card>
                 </TabsContent>
 
-                {isAdmin && (
+                {canManageTeam && (
                 <TabsContent value="team" className="space-y-4">
                     <TeamTabContent />
                 </TabsContent>

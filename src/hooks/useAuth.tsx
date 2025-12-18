@@ -48,7 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Evita loop de re-fetch em caso de ausência de empresa ou falhas intermitentes
   const companyBootstrapRef = useRef<string | null>(null);
 
-  const fetchProfile = async (userId: string): Promise<{ profile: UserProfile | null; companyId: string | null }> => {
+  const fetchProfile = async (userId: string, overrideCompanyId?: string | null): Promise<{ profile: UserProfile | null; companyId: string | null }> => {
     try {
       // Busca perfil básico
       const { data: profileData, error: profileError } = await supabase
@@ -66,24 +66,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { profile: null, companyId: null };
       }
 
-      // Busca role do usuário
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      // Busca TODAS as empresas do usuário e seleciona a primeira
+      // Busca TODAS as empresas do usuário com suas roles
       const { data: companiesData } = await supabase
         .from('user_companies')
-        .select('company_id')
+        .select('company_id, role')
         .eq('user_id', userId)
-        .order('created_at', { ascending: true })
-        .limit(1);
+        .order('created_at', { ascending: true });
 
       const firstCompanyId = companiesData && companiesData.length > 0 
         ? companiesData[0].company_id 
         : null;
+
+      // Usa a empresa override ou a primeira empresa
+      const targetCompanyId = overrideCompanyId || firstCompanyId;
+
+      // Busca a role da empresa selecionada (prioridade)
+      let userRole: 'admin' | 'gestor' | 'colaborador' = 'colaborador';
+      
+      if (targetCompanyId && companiesData) {
+        const companyRecord = companiesData.find(c => c.company_id === targetCompanyId);
+        if (companyRecord?.role) {
+          userRole = companyRecord.role as 'admin' | 'gestor' | 'colaborador';
+        }
+      }
+
+      // Fallback: busca role da tabela user_roles se não encontrou em user_companies
+      if (userRole === 'colaborador') {
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', userId)
+          .maybeSingle();
+        
+        if (roleData?.role) {
+          userRole = roleData.role as 'admin' | 'gestor' | 'colaborador';
+        }
+      }
 
       // Busca departamento do usuário
       const { data: departmentData } = await supabase
@@ -98,13 +116,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: profileData.email,
         avatar_url: profileData.avatar_url,
         department_id: departmentData?.department_id || null,
-        company_id: firstCompanyId,
-        role: (roleData?.role as 'admin' | 'gestor' | 'colaborador') || 'colaborador',
+        company_id: targetCompanyId,
+        role: userRole,
         created_at: profileData.created_at,
         updated_at: profileData.updated_at,
       };
 
-      return { profile: userProfile, companyId: firstCompanyId };
+      return { profile: userProfile, companyId: targetCompanyId };
     } catch (error) {
       console.error('Unexpected error fetching profile:', error);
       return { profile: null, companyId: null };
@@ -250,11 +268,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refetchProfile: async () => {
         if (authState.user) {
           setAuthState(prev => ({ ...prev, companyLoading: true }));
-          const { profile, companyId } = await fetchProfile(authState.user.id);
+          // Usa a empresa selecionada atual para buscar a role correta
+          const { profile, companyId } = await fetchProfile(authState.user.id, authState.selectedCompanyId);
           setAuthState(prev => ({
             ...prev,
             profile,
-            selectedCompanyId: companyId || prev.selectedCompanyId,
+            selectedCompanyId: prev.selectedCompanyId || companyId,
             companyLoading: false,
           }));
         }
