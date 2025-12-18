@@ -520,6 +520,14 @@ export function ActivityDetailsSheet({
                                 </div>
                             </InputWrapper>
 
+                            {isDepartmentActivity && initialActivity?.department && (
+                                <InputWrapper icon={Building2} label="Departamento">
+                                    <span className="text-sm font-medium">
+                                        {initialActivity.department.name || 'Departamento'}
+                                    </span>
+                                </InputWrapper>
+                            )}
+
                             <InputWrapper icon={Target} label="Meta">
                                 <div className="flex items-center gap-2">
                                     <Input
@@ -570,7 +578,7 @@ export function ActivityDetailsSheet({
                         </div>
 
                         {/* Checklist Section */}
-                        {mode === 'view' && initialActivity?.id && isDepartmentActivity && (
+                        {initialActivity?.id && isDepartmentActivity && (
                             <>
                                 <Separator />
                                 <div className="space-y-4">
@@ -637,7 +645,7 @@ export function ActivityDetailsSheet({
                         )}
 
                         {/* Comments Section */}
-                        {mode === 'view' && initialActivity?.id && isDepartmentActivity && (
+                        {initialActivity?.id && isDepartmentActivity && (
                             <>
                                 <Separator />
                                 <div className="space-y-4">
@@ -685,7 +693,7 @@ export function ActivityDetailsSheet({
                         )}
 
                         {/* Diário de Bordo Section */}
-                        {mode === 'view' && initialActivity?.id && isDepartmentActivity && (
+                        {initialActivity?.id && isDepartmentActivity && (
                             <>
                                 <Separator />
                                 <div className="space-y-4">
@@ -728,7 +736,7 @@ export function ActivityDetailsSheet({
                         )}
 
                         {/* History Section */}
-                        {mode === 'view' && initialActivity?.id && isDepartmentActivity && (
+                        {initialActivity?.id && isDepartmentActivity && (
                             <>
                                 <Separator />
                                 <div className="space-y-4">

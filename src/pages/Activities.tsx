@@ -40,6 +40,10 @@ interface DepartmentActivity {
   priority: string | null;
   created_by: string | null;
   created_at: string | null;
+  department?: {
+    id: string;
+    name: string;
+  } | null;
   assignees?: {
     user_id: string;
     profiles?: {
@@ -180,6 +184,7 @@ const Activities = () => {
         priority: activity.priority,
         created_by: activity.created_by,
         created_at: activity.created_at,
+        department: activity.department,
         assignees: (assigneesData || [])
           .filter(a => a.activity_id === activity.id)
           .map(a => ({
