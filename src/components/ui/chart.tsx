@@ -58,6 +58,30 @@ const ChartContainer = React.forwardRef<
 });
 ChartContainer.displayName = "Chart";
 
+// Validation helpers for CSS injection prevention
+const isValidCssKey = (key: string): boolean => {
+  // Only allow alphanumeric characters, hyphens, and underscores
+  return /^[a-zA-Z0-9_-]+$/.test(key);
+};
+
+const isValidCssColor = (color: string): boolean => {
+  // Allow hex colors, rgb/rgba, hsl/hsla, and CSS color names
+  const hexPattern = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/;
+  const rgbPattern = /^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*(,\s*(0|1|0?\.\d+))?\s*\)$/;
+  const hslPattern = /^hsla?\(\s*\d{1,3}\s*,\s*\d{1,3}%?\s*,\s*\d{1,3}%?\s*(,\s*(0|1|0?\.\d+))?\s*\)$/;
+  const cssVarPattern = /^var\(--[a-zA-Z0-9_-]+\)$/;
+  // Common CSS color names (subset)
+  const colorNames = /^(transparent|currentColor|inherit|initial|unset|black|white|red|green|blue|yellow|orange|purple|pink|gray|grey)$/i;
+  
+  return (
+    hexPattern.test(color) ||
+    rgbPattern.test(color) ||
+    hslPattern.test(color) ||
+    cssVarPattern.test(color) ||
+    colorNames.test(color)
+  );
+};
+
 const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
   const colorConfig = Object.entries(config).filter(([_, config]) => config.theme || config.color);
 
@@ -65,23 +89,38 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
     return null;
   }
 
+  // Generate sanitized CSS
+  const cssContent = Object.entries(THEMES)
+    .map(([theme, prefix]) => {
+      const cssVariables = colorConfig
+        .map(([key, itemConfig]) => {
+          // Validate key
+          if (!isValidCssKey(key)) {
+            console.warn(`Invalid chart config key rejected: ${key}`);
+            return null;
+          }
+          
+          const color = itemConfig.theme?.[theme as keyof typeof itemConfig.theme] || itemConfig.color;
+          
+          // Validate color value
+          if (color && !isValidCssColor(color)) {
+            console.warn(`Invalid chart color value rejected: ${color}`);
+            return null;
+          }
+          
+          return color ? `  --color-${key}: ${color};` : null;
+        })
+        .filter(Boolean)
+        .join("\n");
+      
+      return `${prefix} [data-chart=${id}] {\n${cssVariables}\n}`;
+    })
+    .join("\n");
+
   return (
     <style
       dangerouslySetInnerHTML={{
-        __html: Object.entries(THEMES)
-          .map(
-            ([theme, prefix]) => `
-${prefix} [data-chart=${id}] {
-${colorConfig
-  .map(([key, itemConfig]) => {
-    const color = itemConfig.theme?.[theme as keyof typeof itemConfig.theme] || itemConfig.color;
-    return color ? `  --color-${key}: ${color};` : null;
-  })
-  .join("\n")}
-}
-`,
-          )
-          .join("\n"),
+        __html: cssContent,
       }}
     />
   );
