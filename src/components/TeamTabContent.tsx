@@ -1,4 +1,4 @@
-import { Users, Mail, Shield, UserCog, User as UserIcon, Plus, Pencil, Key } from "lucide-react";
+import { Users, Mail, Shield, UserCog, User as UserIcon, Plus, Pencil, Key, FolderKanban } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -50,6 +50,7 @@ interface TeamMember {
     role: "admin" | "gestor" | "colaborador";
     departments: { id: string; name: string }[];
     companies: { id: string; name: string }[];
+    projects: { id: string; name: string }[];
 }
 
 const getRoleInfo = (role: string) => {
@@ -127,6 +128,7 @@ export const TeamTabContent = () => {
     const [selectedCompanies, setSelectedCompanies] = useState<string[]>([]);
     const [editDepartments, setEditDepartments] = useState<string[]>([]);
     const [editCompanies, setEditCompanies] = useState<string[]>([]);
+    const [editProjects, setEditProjects] = useState<string[]>([]);
     const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
 
     // Form para criar
@@ -191,6 +193,7 @@ export const TeamTabContent = () => {
             });
             setEditDepartments(editingMember.departments.map(d => d.id));
             setEditCompanies(editingMember.companies.map(c => c.id));
+            setEditProjects(editingMember.projects.map(p => p.id));
         }
     }, [editingMember, editForm]);
 
@@ -210,7 +213,24 @@ export const TeamTabContent = () => {
         enabled: !!selectedCompanyId,
     });
 
-    // Buscar membros da equipe combinando profiles, user_companies e user_departments
+    // Buscar projetos da empresa
+    const { data: projects } = useQuery({
+        queryKey: ["projects-for-team", selectedCompanyId],
+        queryFn: async () => {
+            if (!selectedCompanyId) return [];
+            const { data, error } = await supabase
+                .from("projects")
+                .select("id, name")
+                .eq("company_id", selectedCompanyId)
+                .eq("status", "ativo")
+                .order("name");
+            if (error) throw error;
+            return data;
+        },
+        enabled: !!selectedCompanyId,
+    });
+
+    // Buscar membros da equipe combinando profiles, user_companies, user_departments e project_members
     const { data: teamMembers, isLoading, error } = useQuery({
         queryKey: ["team-members", selectedCompanyId],
         queryFn: async () => {
@@ -260,11 +280,24 @@ export const TeamTabContent = () => {
 
             if (compsError) throw compsError;
 
-            // Combinar dados - agora com múltiplos departamentos e empresas
+            // Buscar projetos dos usuários
+            const { data: userProjects, error: projectsError } = await supabase
+                .from("project_members")
+                .select(`
+                    user_id,
+                    project_id,
+                    project:projects(id, name)
+                `)
+                .in("user_id", userIds);
+
+            if (projectsError) throw projectsError;
+
+            // Combinar dados - agora com múltiplos departamentos, empresas e projetos
             const members: TeamMember[] = (profiles || []).map(profile => {
                 const companyUser = companyUsers.find(u => u.user_id === profile.id);
                 const userDepartments = userDepts?.filter(d => d.user_id === profile.id) || [];
                 const userCompanies = userComps?.filter(c => c.user_id === profile.id) || [];
+                const userProjectsList = userProjects?.filter(p => p.user_id === profile.id) || [];
                 
                 return {
                     id: profile.id,
@@ -277,6 +310,9 @@ export const TeamTabContent = () => {
                         .filter(Boolean),
                     companies: userCompanies
                         .map(c => c.company as { id: string; name: string })
+                        .filter(Boolean),
+                    projects: userProjectsList
+                        .map(p => p.project as { id: string; name: string })
                         .filter(Boolean),
                 };
             });
@@ -363,10 +399,40 @@ export const TeamTabContent = () => {
                 throw new Error(response.data.error);
             }
 
+            // Atualizar projetos do usuário (se não for admin)
+            if (values.role !== 'admin') {
+                // Remover projetos antigos
+                const { error: deleteError } = await supabase
+                    .from("project_members")
+                    .delete()
+                    .eq("user_id", editingMember.id);
+
+                if (deleteError) {
+                    console.error("Error deleting old project memberships:", deleteError);
+                }
+
+                // Adicionar novos projetos
+                if (editProjects.length > 0) {
+                    const projectMemberships = editProjects.map(projectId => ({
+                        project_id: projectId,
+                        user_id: editingMember.id
+                    }));
+
+                    const { error: insertError } = await supabase
+                        .from("project_members")
+                        .insert(projectMemberships);
+
+                    if (insertError) {
+                        console.error("Error adding project memberships:", insertError);
+                    }
+                }
+            }
+
             return response.data;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["team-members"] });
+            queryClient.invalidateQueries({ queryKey: ["projects"] });
             toast({
                 title: "Usuário atualizado com sucesso!",
                 description: "As alterações foram salvas.",
@@ -376,6 +442,7 @@ export const TeamTabContent = () => {
             editForm.reset();
             setEditDepartments([]);
             setEditCompanies([]);
+            setEditProjects([]);
         },
         onError: (error: any) => {
             toast({
@@ -734,6 +801,20 @@ export const TeamTabContent = () => {
                                         </div>
                                     </div>
                                 )}
+                                {member.role !== 'admin' && member.projects.length > 0 && (
+                                    <div className="space-y-1">
+                                        <p className="text-xs text-muted-foreground font-medium">
+                                            Projetos:
+                                        </p>
+                                        <div className="flex flex-wrap gap-1">
+                                            {member.projects.map((project) => (
+                                                <Badge key={project.id} variant="secondary" className="text-xs">
+                                                    {project.name}
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                                 {member.departments.length === 0 && (
                                     <p className="text-xs text-muted-foreground">
                                         Nenhum departamento atribuído
@@ -758,6 +839,7 @@ export const TeamTabContent = () => {
                     setEditingMember(null);
                     setEditDepartments([]);
                     setEditCompanies([]);
+                    setEditProjects([]);
                 }
             }}>
                 <DialogContent className="sm:max-w-[500px]">
@@ -850,6 +932,26 @@ export const TeamTabContent = () => {
                                 )}
                             />
 
+                            {/* Seleção de Projetos - apenas para não-admin */}
+                            {editForm.watch('role') !== 'admin' && (
+                                <FormItem>
+                                    <FormLabel className="flex items-center gap-2">
+                                        <FolderKanban className="h-4 w-4" />
+                                        Projetos com Acesso
+                                    </FormLabel>
+                                    <FormDescription>
+                                        Selecione os projetos que este usuário pode visualizar
+                                    </FormDescription>
+                                    <MultiSelect
+                                        options={projects?.map(p => ({ value: p.id, label: p.name })) || []}
+                                        selected={editProjects}
+                                        onChange={setEditProjects}
+                                        placeholder="Selecione os projetos..."
+                                        emptyMessage="Nenhum projeto cadastrado"
+                                    />
+                                </FormItem>
+                            )}
+
                             <FormField
                                 control={editForm.control}
                                 name="password"
@@ -883,6 +985,7 @@ export const TeamTabContent = () => {
                                         setEditingMember(null);
                                         setEditDepartments([]);
                                         setEditCompanies([]);
+                                        setEditProjects([]);
                                     }}
                                 >
                                     Cancelar
