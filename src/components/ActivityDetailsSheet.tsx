@@ -429,10 +429,12 @@ export function ActivityDetailsSheet({
                     ? { name: formData.name, status: formData.status, description: formData.description, goal_date: formData.goal_date || null, deadline: formData.deadline || null }
                     : activityData;
 
-                const { error } = await supabase
+                const { data: updatedActivity, error } = await supabase
                     .from(table)
                     .update(updateData)
-                    .eq('id', activityId);
+                    .eq('id', activityId)
+                    .select()
+                    .single();
 
                 if (error) throw error;
 
@@ -448,12 +450,46 @@ export function ActivityDetailsSheet({
                     await supabase.from(assigneesTable).insert(assigneesData);
                 }
 
+                // Gamificação: dar pontos quando status muda para concluida
+                if (initialActivity?.status !== 'concluida' && formData.status === 'concluida' && selectedCompanyId) {
+                    const deadlineStatus = updatedActivity?.deadline_status;
+                    
+                    // Determinar pontos baseado no deadline_status
+                    // bateu_meta = 10 pontos, concluido_no_prazo = 5 pontos
+                    let points = 0;
+                    let isBeatGoal = false;
+                    
+                    if (deadlineStatus === 'bateu_meta') {
+                        points = 10;
+                        isBeatGoal = true;
+                    } else if (deadlineStatus === 'concluido_no_prazo') {
+                        points = 5;
+                    }
+                    
+                    // Dar pontos para todos os assignees
+                    if (points > 0 && selectedAssignees.length > 0) {
+                        for (const userId of selectedAssignees) {
+                            try {
+                                await supabase.rpc('add_user_score', {
+                                    _user_id: userId,
+                                    _company_id: selectedCompanyId,
+                                    _points: points,
+                                    _is_beat_goal: isBeatGoal
+                                });
+                            } catch (e) {
+                                console.error('Erro ao adicionar score:', e);
+                            }
+                        }
+                    }
+                }
+
                 toast.success("Atividade atualizada com sucesso!");
             }
 
             queryClient.invalidateQueries({ queryKey: ['department-activities'] });
             queryClient.invalidateQueries({ queryKey: ['project-activities'] });
             queryClient.invalidateQueries({ queryKey: ['global-activities'] });
+            queryClient.invalidateQueries({ queryKey: ['gamification-report'] });
 
             onOpenChange(false);
 
