@@ -111,23 +111,20 @@ export function AppSidebar() {
     if (!newCompanyName.trim() || !profile?.id) return;
 
     try {
-      const { data: company, error } = await supabase
-        .from('companies')
-        .insert({
+      // Usar Edge Function para criar empresa e vincular todos os admins
+      const response = await supabase.functions.invoke("create-company", {
+        body: {
           name: newCompanyName,
-          created_by: profile.id
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // Link User
-      await supabase.from('user_companies').insert({
-        user_id: profile.id,
-        company_id: company.id,
-        role: 'admin'
+        },
       });
+
+      if (response.error) {
+        throw new Error(response.error.message || "Erro ao criar empresa");
+      }
+
+      if (response.data?.error) {
+        throw new Error(response.data.error);
+      }
 
       toast.success("Empresa criada com sucesso!");
       setIsCreatingCompany(false);
