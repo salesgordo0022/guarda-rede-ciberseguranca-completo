@@ -37,7 +37,7 @@ export function useGlobalMetrics() {
         .from('project_activities')
         .select(
           `
-          id, name, status, deadline, deadline_status, priority, description,
+          id, name, status, deadline, deadline_status, description,
           project:projects!inner(id, name, company_id)
         `
         )
@@ -65,7 +65,7 @@ export function useGlobalMetrics() {
         status: a.status ?? 'pendente',
         deadline: a.deadline,
         deadline_status: a.deadline_status,
-        priority: a.priority,
+        priority: null, // project_activities não tem coluna priority
         description: a.description,
         type: 'project',
         source_name: a.project?.name || 'Sem projeto',
