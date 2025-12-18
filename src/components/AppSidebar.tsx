@@ -147,8 +147,8 @@ export function AppSidebar() {
           <div className="flex flex-col items-center gap-4 animate-fade-in">
             <div className="flex flex-col items-center gap-2">
               <Avatar className="h-16 w-16 cursor-pointer hover-scale">
-                <AvatarImage src={profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile?.full_name || 'User'}`} />
-                <AvatarFallback>{profile?.full_name?.substring(0, 2).toUpperCase() || 'US'}</AvatarFallback>
+                <AvatarImage src={profile?.avatar_url || undefined} />
+                <AvatarFallback className="text-xl bg-primary text-primary-foreground">{profile?.full_name?.substring(0, 2).toUpperCase() || 'US'}</AvatarFallback>
               </Avatar>
               <div className="text-center">
                 <div className="font-bold text-sidebar-foreground inline-flex items-center gap-1">

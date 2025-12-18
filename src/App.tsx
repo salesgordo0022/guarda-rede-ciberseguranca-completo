@@ -43,8 +43,8 @@ const UserProfile = () => {
   return (
     <div className="flex items-center gap-2">
       <Avatar className="h-8 w-8">
-        <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${profile?.full_name || 'User'}`} />
-        <AvatarFallback className="text-xs">
+        <AvatarImage src={profile?.avatar_url || undefined} />
+        <AvatarFallback className="text-xs bg-primary text-primary-foreground">
           {profile?.full_name?.substring(0, 2).toUpperCase() || 'US'}
         </AvatarFallback>
       </Avatar>
