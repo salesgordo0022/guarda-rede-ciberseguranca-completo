@@ -27,6 +27,7 @@ interface Activity {
   scheduled_date?: string | null;
   deadline_status?: DeadlineStatus | null;
   updated_at: string;
+  priority?: string | null;
   assignees?: Assignee[];
   department?: {
     name: string;
@@ -66,6 +67,18 @@ const getStatusLabel = (status: string) => {
   }
 };
 
+const getPriorityBadge = (priority: string | null | undefined) => {
+  switch (priority) {
+    case 'urgente':
+      return <Badge className="bg-red-500/10 text-red-500 border-red-500/20 text-xs">Urgente</Badge>;
+    case 'nao_urgente':
+      return <Badge className="bg-green-500/10 text-green-500 border-green-500/20 text-xs">Não Urgente</Badge>;
+    case 'media':
+      return <Badge className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20 text-xs">Média</Badge>;
+    default:
+      return <span className="text-muted-foreground">—</span>;
+  }
+};
 
 const formatDate = (date: string | null | undefined) => {
   if (!date) return "—";
@@ -109,12 +122,11 @@ export const ActivityTable = ({
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/50 hover:bg-muted/50 text-xs uppercase">
-            <TableHead className="w-[300px]">Atividades</TableHead>
-            <TableHead className="w-[200px]">Responsável</TableHead>
-            <TableHead className="w-[100px]">Progresso</TableHead>
-            <TableHead className="w-[140px]">Status</TableHead>
+            <TableHead className="w-[280px]">Atividades</TableHead>
+            <TableHead className="w-[180px]">Responsável</TableHead>
+            <TableHead className="w-[100px]">Prioridade</TableHead>
+            <TableHead className="w-[130px]">Status</TableHead>
             <TableHead className="w-[100px]">Departamento</TableHead>
-            <TableHead className="w-[110px]">Data Programada</TableHead>
             <TableHead className="w-[100px]">Prazo</TableHead>
             {showActions && <TableHead className="text-right w-[80px]">Ações</TableHead>}
           </TableRow>
@@ -122,13 +134,13 @@ export const ActivityTable = ({
         <TableBody>
           {isLoading ? (
             <TableRow>
-              <TableCell colSpan={showActions ? 8 : 7} className="text-center py-8">
+              <TableCell colSpan={showActions ? 7 : 6} className="text-center py-8">
                 Carregando atividades...
               </TableCell>
             </TableRow>
           ) : activities.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={showActions ? 8 : 7} className="text-center text-muted-foreground py-12">
+              <TableCell colSpan={showActions ? 7 : 6} className="text-center text-muted-foreground py-12">
                 <div className="flex flex-col items-center gap-2">
                   <AlertCircle className="h-8 w-8 opacity-50" />
                   <p>{emptyMessage}</p>
@@ -166,14 +178,14 @@ export const ActivityTable = ({
                   </div>
                 </TableCell>
                 <TableCell>
-                  {/* Placeholder for progress chart */}
+                  {getPriorityBadge((activity as any).priority)}
                 </TableCell>
                 <TableCell>
                   <Select
                     defaultValue={activity.status}
                     onValueChange={(value) => onStatusChange(activity.id, value as ActivityStatus)}
                   >
-                    <SelectTrigger className={`w-[130px] h-7 text-xs ${getStatusColor(activity.status)} border-0`}>
+                    <SelectTrigger className={`w-[120px] h-7 text-xs ${getStatusColor(activity.status)} border-0`}>
                       <SelectValue>{getStatusLabel(activity.status)}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
@@ -192,9 +204,6 @@ export const ActivityTable = ({
                   ) : (
                     <span className="text-muted-foreground">—</span>
                   )}
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {formatDate(activity.scheduled_date)}
                 </TableCell>
                 <TableCell>
                   {activity.deadline && !isNaN(new Date(activity.deadline).getTime()) ? (
