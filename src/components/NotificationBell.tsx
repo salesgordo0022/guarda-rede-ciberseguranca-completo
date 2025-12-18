@@ -1,4 +1,5 @@
-import { Bell, Check, CheckCheck, Trash2, User, MessageSquare, Clock, RefreshCw } from "lucide-react";
+import { useState } from "react";
+import { Bell, Check, CheckCheck, Trash2, User, MessageSquare, Clock, RefreshCw, Square, CheckSquare, SquareCheckBig } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
   Popover, 
@@ -6,6 +7,7 @@ import {
   PopoverTrigger 
 } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotifications, Notification } from "@/hooks/useNotifications";
 import { formatDistanceToNow } from "date-fns";
@@ -30,20 +32,34 @@ const getNotificationIcon = (type: string) => {
 function NotificationItem({ 
   notification, 
   onMarkAsRead, 
-  onDelete 
+  onDelete,
+  isSelectionMode,
+  isSelected,
+  onToggleSelect
 }: { 
   notification: Notification; 
   onMarkAsRead: () => void;
   onDelete: () => void;
+  isSelectionMode: boolean;
+  isSelected: boolean;
+  onToggleSelect: () => void;
 }) {
   return (
     <div
       className={cn(
         "p-3 border-b last:border-b-0 hover:bg-muted/50 transition-colors",
-        !notification.read && "bg-primary/5"
+        !notification.read && "bg-primary/5",
+        isSelected && "bg-destructive/10"
       )}
     >
       <div className="flex items-start gap-3">
+        {isSelectionMode && (
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={onToggleSelect}
+            className="mt-0.5"
+          />
+        )}
         <div className="mt-0.5">
           {getNotificationIcon(notification.type)}
         </div>
@@ -66,34 +82,36 @@ function NotificationItem({
             })}
           </p>
         </div>
-        <div className="flex items-center gap-1">
-          {!notification.read && (
+        {!isSelectionMode && (
+          <div className="flex items-center gap-1">
+            {!notification.read && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onMarkAsRead();
+                }}
+                title="Marcar como lida"
+              >
+                <Check className="h-3.5 w-3.5" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7"
+              className="h-7 w-7 text-muted-foreground hover:text-destructive"
               onClick={(e) => {
                 e.stopPropagation();
-                onMarkAsRead();
+                onDelete();
               }}
-              title="Marcar como lida"
+              title="Excluir"
             >
-              <Check className="h-3.5 w-3.5" />
+              <Trash2 className="h-3.5 w-3.5" />
             </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-muted-foreground hover:text-destructive"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-            title="Excluir"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -101,6 +119,9 @@ function NotificationItem({
 
 export function NotificationBell() {
   const { profile } = useAuth();
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  
   const { 
     notifications, 
     unreadCount, 
@@ -108,8 +129,40 @@ export function NotificationBell() {
     markAsRead, 
     markAllAsRead, 
     deleteNotification,
-    deleteAllNotifications
+    deleteAllNotifications,
+    deleteMultipleNotifications
   } = useNotifications();
+
+  const toggleSelect = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const selectAll = () => {
+    setSelectedIds(new Set(notifications.map(n => n.id)));
+  };
+
+  const deselectAll = () => {
+    setSelectedIds(new Set());
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedIds.size > 0) {
+      deleteMultipleNotifications.mutate(Array.from(selectedIds));
+      setSelectedIds(new Set());
+      setIsSelectionMode(false);
+    }
+  };
+
+  const exitSelectionMode = () => {
+    setIsSelectionMode(false);
+    setSelectedIds(new Set());
+  };
 
   if (!profile) return null;
 
@@ -138,27 +191,82 @@ export function NotificationBell() {
           <div className="flex items-center justify-between">
             <h3 className="font-semibold">Notificações</h3>
             <div className="flex items-center gap-1">
-              {unreadCount > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 text-xs"
-                  onClick={() => markAllAsRead.mutate()}
-                >
-                  <CheckCheck className="h-3.5 w-3.5 mr-1" />
-                  Marcar lidas
-                </Button>
-              )}
-              {notifications.length > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 text-xs text-destructive hover:text-destructive"
-                  onClick={() => deleteAllNotifications.mutate()}
-                >
-                  <Trash2 className="h-3.5 w-3.5 mr-1" />
-                  Limpar todas
-                </Button>
+              {isSelectionMode ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={selectedIds.size === notifications.length ? deselectAll : selectAll}
+                  >
+                    {selectedIds.size === notifications.length ? (
+                      <>
+                        <Square className="h-3.5 w-3.5 mr-1" />
+                        Desmarcar
+                      </>
+                    ) : (
+                      <>
+                        <SquareCheckBig className="h-3.5 w-3.5 mr-1" />
+                        Selecionar tudo
+                      </>
+                    )}
+                  </Button>
+                  {selectedIds.size > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs text-destructive hover:text-destructive"
+                      onClick={handleDeleteSelected}
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-1" />
+                      Excluir ({selectedIds.size})
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={exitSelectionMode}
+                  >
+                    Cancelar
+                  </Button>
+                </>
+              ) : (
+                <>
+                  {unreadCount > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs"
+                      onClick={() => markAllAsRead.mutate()}
+                    >
+                      <CheckCheck className="h-3.5 w-3.5 mr-1" />
+                      Marcar lidas
+                    </Button>
+                  )}
+                  {notifications.length > 0 && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-xs"
+                        onClick={() => setIsSelectionMode(true)}
+                        title="Selecionar múltiplas"
+                      >
+                        <CheckSquare className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-xs text-destructive hover:text-destructive"
+                        onClick={() => deleteAllNotifications.mutate()}
+                      >
+                        <Trash2 className="h-3.5 w-3.5 mr-1" />
+                        Limpar
+                      </Button>
+                    </>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -182,6 +290,9 @@ export function NotificationBell() {
                 notification={notification}
                 onMarkAsRead={() => markAsRead.mutate(notification.id)}
                 onDelete={() => deleteNotification.mutate(notification.id)}
+                isSelectionMode={isSelectionMode}
+                isSelected={selectedIds.has(notification.id)}
+                onToggleSelect={() => toggleSelect(notification.id)}
               />
             ))
           )}
