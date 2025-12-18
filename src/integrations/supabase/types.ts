@@ -56,6 +56,7 @@ export type Database = {
           deadline_status: Database["public"]["Enums"]["deadline_status"] | null
           department_id: string
           description: string | null
+          goal_date: string | null
           id: string
           name: string
           order_index: number | null
@@ -74,6 +75,7 @@ export type Database = {
             | null
           department_id: string
           description?: string | null
+          goal_date?: string | null
           id?: string
           name: string
           order_index?: number | null
@@ -92,6 +94,7 @@ export type Database = {
             | null
           department_id?: string
           description?: string | null
+          goal_date?: string | null
           id?: string
           name?: string
           order_index?: number | null
@@ -364,6 +367,7 @@ export type Database = {
           deadline: string | null
           deadline_status: Database["public"]["Enums"]["deadline_status"] | null
           description: string | null
+          goal_date: string | null
           id: string
           kanban_column: string | null
           name: string
@@ -382,6 +386,7 @@ export type Database = {
             | Database["public"]["Enums"]["deadline_status"]
             | null
           description?: string | null
+          goal_date?: string | null
           id?: string
           kanban_column?: string | null
           name: string
@@ -400,6 +405,7 @@ export type Database = {
             | Database["public"]["Enums"]["deadline_status"]
             | null
           description?: string | null
+          goal_date?: string | null
           id?: string
           kanban_column?: string | null
           name?: string
