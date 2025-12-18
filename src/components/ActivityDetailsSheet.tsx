@@ -58,7 +58,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
-import { createNotification } from "@/hooks/useNotifications";
+import { 
+    notifyActivityCreated, 
+    notifyActivityStatusChanged,
+    notifyProjectActivityCreated,
+    notifyProjectActivityCompleted,
+    notifyCommentAdded
+} from "@/utils/notificationService";
 
 interface ChecklistItem {
     id: string;
@@ -363,6 +369,45 @@ export function ActivityDetailsSheet({
                         }));
                         await supabase.from('department_activity_checklist').insert(checklistItems);
                     }
+
+                    // Notificar todos da empresa sobre nova atividade
+                    if (selectedCompanyId && profile?.id) {
+                        const departmentId = formData.department_id || preselectedDepartmentId;
+                        const { data: deptData } = await supabase
+                            .from('departments')
+                            .select('name')
+                            .eq('id', departmentId)
+                            .single();
+                        
+                        await notifyActivityCreated(
+                            selectedCompanyId,
+                            formData.name,
+                            deptData?.name || 'Departamento',
+                            departmentId!,
+                            activityId!,
+                            profile.full_name || 'Usuário',
+                            profile.id
+                        );
+                    }
+                } else {
+                    // Notificar todos da empresa sobre nova atividade de projeto
+                    if (selectedCompanyId && profile?.id && preselectedProjectId) {
+                        const { data: projData } = await supabase
+                            .from('projects')
+                            .select('name')
+                            .eq('id', preselectedProjectId)
+                            .single();
+                        
+                        await notifyProjectActivityCreated(
+                            selectedCompanyId,
+                            formData.name,
+                            projData?.name || 'Projeto',
+                            preselectedProjectId,
+                            activityId!,
+                            profile.full_name || 'Usuário',
+                            profile.id
+                        );
+                    }
                 }
 
                 // Salvar responsáveis (assignees)
@@ -381,55 +426,18 @@ export function ActivityDetailsSheet({
                     if (initialActivity.status !== formData.status) {
                         await recordHistory(activityId!, 'alterou', 'status', initialActivity.status, formData.status);
                         
-                        // Notificar assignees sobre mudança de status
-                        if (profile?.id) {
-                            const statusLabels: Record<string, string> = {
-                                'pendente': 'Não iniciado',
-                                'em_andamento': 'Em andamento',
-                                'concluida': 'Finalizado',
-                                'cancelada': 'Cancelado'
-                            };
-                            
-                            const assigneesTable = isProject ? 'project_activity_assignees' : 'department_activity_assignees';
-                            const { data: assignees } = await supabase
-                                .from(assigneesTable)
-                                .select('user_id')
-                                .eq('activity_id', activityId!);
-                            
-                            if (assignees && assignees.length > 0) {
-                                for (const assignee of assignees) {
-                                    try {
-                                        await createNotification({
-                                            userId: assignee.user_id,
-                                            title: assignee.user_id === profile.id 
-                                                ? "Você finalizou uma atividade!" 
-                                                : "Status da atividade alterado",
-                                            description: `"${formData.name}" mudou de ${statusLabels[initialActivity.status] || initialActivity.status} para ${statusLabels[formData.status] || formData.status}`,
-                                            type: "status_change",
-                                            activityId: activityId!,
-                                            departmentId: initialActivity.department_id,
-                                            createdBy: profile.id
-                                        });
-                                    } catch (e) {
-                                        console.error("Erro ao criar notificação:", e);
-                                    }
-                                }
-                            } else {
-                                // Se não houver assignees, notificar o próprio usuário que fez a ação
-                                try {
-                                    await createNotification({
-                                        userId: profile.id,
-                                        title: "Atividade atualizada",
-                                        description: `"${formData.name}" mudou para ${statusLabels[formData.status] || formData.status}`,
-                                        type: "status_change",
-                                        activityId: activityId!,
-                                        departmentId: initialActivity.department_id,
-                                        createdBy: profile.id
-                                    });
-                                } catch (e) {
-                                    console.error("Erro ao criar notificação:", e);
-                                }
-                            }
+                        // Notificar todos da empresa sobre mudança de status
+                        if (profile?.id && selectedCompanyId) {
+                            await notifyActivityStatusChanged(
+                                selectedCompanyId,
+                                formData.name,
+                                initialActivity.status,
+                                formData.status,
+                                activityId!,
+                                initialActivity.department_id,
+                                profile.full_name || 'Usuário',
+                                profile.id
+                            );
                         }
                     }
                     if (initialActivity.priority !== formData.priority) {
@@ -605,33 +613,17 @@ export function ActivityDetailsSheet({
         if (!error && data) {
             setComments([data, ...comments]);
             
-            // Detectar menções (@usuario) e criar notificações
-            const mentionRegex = /@(\w+)/g;
-            const mentions = newComment.match(mentionRegex);
-            
-            if (mentions && profiles && profile?.id) {
-                for (const mention of mentions) {
-                    const mentionName = mention.slice(1).toLowerCase();
-                    const mentionedUser = profiles.find(p => 
-                        p.full_name.toLowerCase().includes(mentionName)
-                    );
-                    
-                    if (mentionedUser && mentionedUser.id !== profile.id) {
-                        try {
-                            await createNotification({
-                                userId: mentionedUser.id,
-                                title: "Você foi mencionado em um comentário",
-                                description: `${profile?.full_name || 'Alguém'} mencionou você: "${newComment.slice(0, 100)}${newComment.length > 100 ? '...' : ''}"`,
-                                type: "mention",
-                                activityId: initialActivity.id,
-                                departmentId: initialActivity.department_id,
-                                createdBy: profile.id
-                            });
-                        } catch (e) {
-                            console.error("Erro ao criar notificação:", e);
-                        }
-                    }
-                }
+            // Notificar todos da empresa sobre o comentário
+            if (profile?.id && selectedCompanyId) {
+                await notifyCommentAdded(
+                    selectedCompanyId,
+                    initialActivity.name,
+                    initialActivity.id,
+                    initialActivity.department_id,
+                    initialActivity.project_id,
+                    profile.full_name || 'Usuário',
+                    profile.id
+                );
             }
             
             setNewComment("");
