@@ -50,31 +50,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchProfile = async (userId: string, overrideCompanyId?: string | null): Promise<{ profile: UserProfile | null; companyId: string | null }> => {
     try {
-      // Busca perfil básico
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
+      // Buscar perfil, empresas e departamento em paralelo para melhor performance
+      const [profileResult, companiesResult, departmentResult] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
+        supabase.from('user_companies').select('company_id, role').eq('user_id', userId).order('created_at', { ascending: true }),
+        supabase.from('user_departments').select('department_id').eq('user_id', userId).maybeSingle()
+      ]);
 
-      if (profileError) {
-        console.error('Error fetching profile:', profileError);
+      if (profileResult.error) {
+        console.error('Error fetching profile:', profileResult.error);
         return { profile: null, companyId: null };
       }
 
+      const profileData = profileResult.data;
       if (!profileData) {
         return { profile: null, companyId: null };
       }
 
-      // Busca TODAS as empresas do usuário com suas roles
-      const { data: companiesData, error: companiesError } = await supabase
-        .from('user_companies')
-        .select('company_id, role')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: true });
-
-      if (companiesError) {
-        console.error('Error fetching user companies:', companiesError);
+      const companiesData = companiesResult.data;
+      if (companiesResult.error) {
+        console.error('Error fetching user companies:', companiesResult.error);
       }
 
       const firstCompanyId = companiesData && companiesData.length > 0
@@ -97,34 +92,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Fallback: se o usuário ainda não tiver empresas vinculadas, usa user_roles (papel global)
       if (!hasCompanyContext) {
-        const { data: roleData, error: roleError } = await supabase
+        const { data: roleData } = await supabase
           .from('user_roles')
           .select('role')
           .eq('user_id', userId)
           .maybeSingle();
-
-        if (roleError) {
-          console.error('Error fetching user role:', roleError);
-        }
 
         if (roleData?.role) {
           userRole = roleData.role as 'admin' | 'gestor' | 'colaborador';
         }
       }
 
-      // Busca departamento do usuário
-      const { data: departmentData } = await supabase
-        .from('user_departments')
-        .select('department_id')
-        .eq('user_id', userId)
-        .maybeSingle();
-
       const userProfile: UserProfile = {
         id: profileData.id,
         full_name: profileData.full_name,
         email: profileData.email,
         avatar_url: profileData.avatar_url,
-        department_id: departmentData?.department_id || null,
+        department_id: departmentResult.data?.department_id || null,
         company_id: targetCompanyId,
         role: userRole,
         created_at: profileData.created_at,

@@ -37,6 +37,7 @@ export function useNotifications() {
       return data as Notification[];
     },
     enabled: !!user?.id,
+    staleTime: 1000 * 30, // 30 segundos - notificações são mais dinâmicas
   });
 
   const unreadCount = notifications.filter((n) => !n.read).length;

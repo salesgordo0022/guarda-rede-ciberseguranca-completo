@@ -20,16 +20,17 @@ const Index = () => {
 
   const { metrics } = useGlobalMetrics();
 
-  // Fetch profiles
+  // Fetch profiles - com staleTime para evitar refetch desnecessário
   const { data: profiles = [] } = useQuery({
     queryKey: ['profiles'],
     queryFn: async () => {
       const { data } = await supabase.from('profiles').select('id, full_name');
       return data || [];
-    }
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutos
   });
 
-  // Fetch departments
+  // Fetch departments - com staleTime para evitar refetch desnecessário
   const { data: departments = [] } = useQuery({
     queryKey: ['departments', selectedCompanyId],
     queryFn: async () => {
@@ -41,10 +42,11 @@ const Index = () => {
         .order('name');
       return data || [];
     },
-    enabled: !!selectedCompanyId
+    enabled: !!selectedCompanyId,
+    staleTime: 1000 * 60 * 5, // 5 minutos
   });
 
-  // Fetch projects for task creation
+  // Fetch projects for task creation - com staleTime para evitar refetch desnecessário
   const { data: projects = [] } = useQuery({
     queryKey: ['projects', selectedCompanyId],
     queryFn: async () => {
@@ -56,7 +58,8 @@ const Index = () => {
         .order('name');
       return data || [];
     },
-    enabled: !!selectedCompanyId
+    enabled: !!selectedCompanyId,
+    staleTime: 1000 * 60 * 5, // 5 minutos
   });
 
   // Dados para gráfico de pizza - Distribuição por status

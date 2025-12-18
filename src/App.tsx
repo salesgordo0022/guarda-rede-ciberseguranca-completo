@@ -33,8 +33,18 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 // Import deadline monitoring
 import { startDeadlineMonitoring } from "@/utils/deadlineMonitor";
 
-// Cliente para gerenciamento de consultas assíncronas
-const queryClient = new QueryClient();
+// Cliente para gerenciamento de consultas assíncronas com configurações otimizadas
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 2, // 2 minutos - dados são considerados frescos
+      gcTime: 1000 * 60 * 10, // 10 minutos - mantém cache em memória
+      refetchOnWindowFocus: false, // Evita refetch ao focar janela
+      retry: 1, // Apenas 1 retry em caso de erro
+      refetchOnMount: true,
+    },
+  },
+});
 
 // Componente para exibir o perfil do usuário
 const UserProfile = () => {

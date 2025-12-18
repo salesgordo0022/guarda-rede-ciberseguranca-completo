@@ -49,7 +49,7 @@ export function AppSidebar() {
   const [newCompanyName, setNewCompanyName] = useState("");
   const [isCreatingCompany, setIsCreatingCompany] = useState(false);
 
-  // Buscar empresas disponíveis
+  // Buscar empresas disponíveis - com staleTime para evitar refetch
   const { data: companies = [] } = useQuery({
     queryKey: ['companies'],
     queryFn: async () => {
@@ -57,10 +57,11 @@ export function AppSidebar() {
       if (error) throw error;
       return data;
     },
-    enabled: !!profile
+    enabled: !!profile,
+    staleTime: 1000 * 60 * 5, // 5 minutos
   });
 
-  // Buscar departamentos da empresa selecionada
+  // Buscar departamentos da empresa selecionada - com staleTime para evitar refetch
   const { data: departments } = useQuery({
     queryKey: ['departments', selectedCompanyId],
     queryFn: async () => {
@@ -75,6 +76,7 @@ export function AppSidebar() {
       return data;
     },
     enabled: !!selectedCompanyId,
+    staleTime: 1000 * 60 * 5, // 5 minutos
   });
 
   // Usa a role diretamente do profile (que agora vem correta da user_companies)
