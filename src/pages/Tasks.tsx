@@ -13,22 +13,11 @@ import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useAuth } from "@/hooks/useAuth";
+import { Tables } from "@/integrations/supabase/types";
 
 type ActivityStatus = "pendente" | "em_andamento" | "concluida" | "cancelada";
 
-interface Activity {
-  id: string;
-  name: string;
-  description: string | null;
-  status: ActivityStatus;
-  deadline: string | null;
-  schedule_start: string | null;
-  schedule_end: string | null;
-  deadline_status: string | null;
-  updated_at: string;
-  created_at: string;
-  project_id: string;
-}
+type Activity = Tables<'project_activities'>;
 
 const statusColors: Record<ActivityStatus, string> = {
   "em_andamento": "bg-blue-500 text-white",
@@ -117,7 +106,7 @@ const Tasks = () => {
     const activityData = {
       name,
       description: description || null,
-      status,
+      status: status as ActivityStatus,
       deadline: deadline || null,
       project_id: projectId,
       created_by: user?.id || "",
@@ -129,7 +118,7 @@ const Tasks = () => {
         .update({
           name,
           description: description || null,
-          status,
+          status: status as ActivityStatus,
           deadline: deadline || null,
         })
         .eq("id", editing.id);
@@ -158,7 +147,7 @@ const Tasks = () => {
     setEditing(activity);
     setName(activity.name);
     setDescription(activity.description || "");
-    setStatus(activity.status);
+    setStatus((activity.status as ActivityStatus) || "pendente");
     setDeadline(activity.deadline || "");
     setProjectId(activity.project_id);
     setOpen(true);
@@ -321,8 +310,8 @@ const Tasks = () => {
                     <TableCell className="font-medium">{activity.name}</TableCell>
                     <TableCell>{activity.description || "—"}</TableCell>
                     <TableCell>
-                      <Badge className={statusColors[activity.status]}>
-                        {statusLabels[activity.status]}
+                      <Badge className={statusColors[(activity.status as ActivityStatus) || "pendente"]}>
+                        {statusLabels[(activity.status as ActivityStatus) || "pendente"]}
                       </Badge>
                     </TableCell>
                     <TableCell>
