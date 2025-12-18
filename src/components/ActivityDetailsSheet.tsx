@@ -975,7 +975,7 @@ export function ActivityDetailsSheet({
                         </div>
 
                         {/* Recurrence Section - Only for department activities */}
-                        {!preselectedProjectId && !(initialActivity && !initialActivity.department_id) && (
+                        {(initialActivity?.department_id || (mode === 'create' && !preselectedProjectId)) && (
                             <>
                                 <Separator />
                                 <div className="space-y-4">
