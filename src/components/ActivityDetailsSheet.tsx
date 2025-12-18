@@ -51,6 +51,7 @@ import {
     Users,
     X,
     Check,
+    Repeat,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -133,7 +134,11 @@ export function ActivityDetailsSheet({
         deadline: "",
         description: "",
         priority: "media",
-        department_id: preselectedDepartmentId || ""
+        department_id: preselectedDepartmentId || "",
+        is_recurring: false,
+        recurrence_type: "weekly" as "daily" | "weekly" | "monthly",
+        recurrence_day: 1,
+        recurrence_active: true
     });
 
     // Assignees State
@@ -277,7 +282,11 @@ export function ActivityDetailsSheet({
                     deadline: initialActivity.deadline ? initialActivity.deadline.split('T')[0] : "",
                     description: initialActivity.description || "",
                     priority: initialActivity.priority || "media",
-                    department_id: initialActivity.department_id || ""
+                    department_id: initialActivity.department_id || "",
+                    is_recurring: initialActivity.is_recurring || false,
+                    recurrence_type: initialActivity.recurrence_type || "weekly",
+                    recurrence_day: initialActivity.recurrence_day ?? 1,
+                    recurrence_active: initialActivity.recurrence_active ?? true
                 });
                 // Assignees serão carregados pelo fetchActivityData
             } else {
@@ -288,7 +297,11 @@ export function ActivityDetailsSheet({
                     deadline: "",
                     description: "",
                     priority: "media",
-                    department_id: preselectedDepartmentId || ""
+                    department_id: preselectedDepartmentId || "",
+                    is_recurring: false,
+                    recurrence_type: "weekly",
+                    recurrence_day: 1,
+                    recurrence_active: true
                 });
                 setSelectedAssignees([]);
                 setChecklist([]);
@@ -336,7 +349,14 @@ export function ActivityDetailsSheet({
                 description: formData.description,
                 goal_date: formData.goal_date || null,
                 deadline: formData.deadline || null,
-                priority: formData.priority
+                priority: formData.priority,
+                // Recurrence fields (only for department activities)
+                ...(isProject ? {} : {
+                    is_recurring: formData.is_recurring,
+                    recurrence_type: formData.is_recurring ? formData.recurrence_type : null,
+                    recurrence_day: formData.is_recurring ? formData.recurrence_day : null,
+                    recurrence_active: formData.is_recurring ? formData.recurrence_active : false
+                })
             };
 
             let activityId = initialActivity?.id;
@@ -527,7 +547,7 @@ export function ActivityDetailsSheet({
         }
     };
 
-    const handleChange = (field: string, value: string) => {
+    const handleChange = (field: string, value: string | boolean | number) => {
         setFormData(prev => ({ ...prev, [field]: value }));
     };
 
@@ -953,6 +973,133 @@ export function ActivityDetailsSheet({
                                 className="min-h-[100px] resize-none"
                             />
                         </div>
+
+                        {/* Recurrence Section - Only for department activities */}
+                        {!preselectedProjectId && !(initialActivity && !initialActivity.department_id) && (
+                            <>
+                                <Separator />
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2 text-muted-foreground font-medium">
+                                            <Repeat className="h-4 w-4" />
+                                            Atividade Recorrente
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm text-muted-foreground">
+                                                {formData.is_recurring ? 'Ativa' : 'Desativada'}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleChange('is_recurring', !formData.is_recurring)}
+                                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                                    formData.is_recurring ? 'bg-primary' : 'bg-muted'
+                                                }`}
+                                            >
+                                                <span
+                                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                                        formData.is_recurring ? 'translate-x-6' : 'translate-x-1'
+                                                    }`}
+                                                />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {formData.is_recurring && (
+                                        <div className="space-y-4 pl-6 border-l-2 border-primary/20 animate-in fade-in slide-in-from-top-2 duration-200">
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-medium">Frequência</label>
+                                                <Select 
+                                                    value={formData.recurrence_type} 
+                                                    onValueChange={(value: "daily" | "weekly" | "monthly") => {
+                                                        handleChange('recurrence_type', value);
+                                                        if (value === 'weekly') handleChange('recurrence_day', 1);
+                                                        if (value === 'monthly') handleChange('recurrence_day', 1);
+                                                    }}
+                                                >
+                                                    <SelectTrigger className="w-full">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="daily">Diária</SelectItem>
+                                                        <SelectItem value="weekly">Semanal</SelectItem>
+                                                        <SelectItem value="monthly">Mensal</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+
+                                            {formData.recurrence_type === 'weekly' && (
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-medium">Dia da Semana</label>
+                                                    <Select 
+                                                        value={String(formData.recurrence_day)} 
+                                                        onValueChange={(v) => handleChange('recurrence_day', Number(v))}
+                                                    >
+                                                        <SelectTrigger className="w-full">
+                                                            <SelectValue />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="0">Domingo</SelectItem>
+                                                            <SelectItem value="1">Segunda-feira</SelectItem>
+                                                            <SelectItem value="2">Terça-feira</SelectItem>
+                                                            <SelectItem value="3">Quarta-feira</SelectItem>
+                                                            <SelectItem value="4">Quinta-feira</SelectItem>
+                                                            <SelectItem value="5">Sexta-feira</SelectItem>
+                                                            <SelectItem value="6">Sábado</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                            )}
+
+                                            {formData.recurrence_type === 'monthly' && (
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-medium">Dia do Mês</label>
+                                                    <Select 
+                                                        value={String(formData.recurrence_day)} 
+                                                        onValueChange={(v) => handleChange('recurrence_day', Number(v))}
+                                                    >
+                                                        <SelectTrigger className="w-full">
+                                                            <SelectValue />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                                                                <SelectItem key={day} value={String(day)}>
+                                                                    Dia {day}
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                            )}
+
+                                            <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+                                                {formData.recurrence_type === 'daily' && '📅 Uma nova atividade será criada todos os dias automaticamente.'}
+                                                {formData.recurrence_type === 'weekly' && `📅 Uma nova atividade será criada toda ${['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'][formData.recurrence_day]}.`}
+                                                {formData.recurrence_type === 'monthly' && `📅 Uma nova atividade será criada todo dia ${formData.recurrence_day} de cada mês.`}
+                                            </p>
+
+                                            {mode === 'view' && initialActivity?.is_recurring && (
+                                                <div className="flex items-center justify-between pt-2">
+                                                    <span className="text-sm">Recorrência ativa</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleChange('recurrence_active', !formData.recurrence_active)}
+                                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                                            formData.recurrence_active ? 'bg-green-500' : 'bg-destructive'
+                                                        }`}
+                                                    >
+                                                        <span
+                                                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                                                formData.recurrence_active ? 'translate-x-6' : 'translate-x-1'
+                                                            }`}
+                                                        />
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        )}
 
                         {/* Checklist Section */}
                         <>
