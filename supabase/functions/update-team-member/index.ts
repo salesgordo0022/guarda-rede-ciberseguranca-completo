@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { userId, companyId, role, departmentIds, password, fullName } = await req.json();
+    const { userId, companyId, role, departmentIds, password, fullName, companyIds } = await req.json();
 
     // Verify the calling user is an admin of the company
     const { data: userCompany } = await supabaseAdmin
@@ -89,8 +89,36 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Update role in user_companies
-    if (role) {
+    // Update companies if provided
+    if (companyIds !== undefined && Array.isArray(companyIds)) {
+      // Remove existing company assignments
+      await supabaseAdmin
+        .from("user_companies")
+        .delete()
+        .eq("user_id", userId);
+
+      // Add new company assignments
+      if (companyIds.length > 0) {
+        const companyInserts = companyIds.map((cId: string, index: number) => ({
+          user_id: userId,
+          company_id: cId,
+          role: index === 0 ? role : "colaborador", // First company gets the selected role
+        }));
+
+        const { error: companyError } = await supabaseAdmin
+          .from("user_companies")
+          .insert(companyInserts);
+
+        if (companyError) {
+          console.error("Company update error:", companyError);
+          return new Response(
+            JSON.stringify({ error: "Erro ao atualizar empresas: " + companyError.message }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+    } else if (role) {
+      // Update role in user_companies only if companyIds not provided
       const { error: roleError } = await supabaseAdmin
         .from("user_companies")
         .update({ role })
