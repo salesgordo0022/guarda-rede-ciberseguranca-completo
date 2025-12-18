@@ -61,21 +61,45 @@ export function AppSidebar() {
     staleTime: 1000 * 60 * 5, // 5 minutos
   });
 
-  // Buscar departamentos da empresa selecionada - com staleTime para evitar refetch
+  // Buscar departamentos da empresa selecionada - filtrado por acesso do usuário
   const { data: departments } = useQuery({
-    queryKey: ['departments', selectedCompanyId],
+    queryKey: ['departments', selectedCompanyId, profile?.id, profile?.role],
     queryFn: async () => {
-      if (!selectedCompanyId) return [];
+      if (!selectedCompanyId || !profile?.id) return [];
+
+      // Admin vê todos os departamentos da empresa
+      if (profile.role === 'admin') {
+        const { data, error } = await supabase
+          .from('departments')
+          .select('*')
+          .eq('company_id', selectedCompanyId);
+
+        if (error) throw error;
+        return data;
+      }
+
+      // Colaborador/Gestor vê apenas departamentos aos quais tem acesso
+      const { data: userDepts, error: userDeptsError } = await supabase
+        .from('user_departments')
+        .select('department_id')
+        .eq('user_id', profile.id);
+
+      if (userDeptsError) throw userDeptsError;
+
+      const userDeptIds = userDepts?.map(ud => ud.department_id) || [];
+
+      if (userDeptIds.length === 0) return [];
 
       const { data, error } = await supabase
         .from('departments')
         .select('*')
-        .eq('company_id', selectedCompanyId);
+        .eq('company_id', selectedCompanyId)
+        .in('id', userDeptIds);
 
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!selectedCompanyId && !!profile?.id,
     staleTime: 1000 * 60 * 5, // 5 minutos
   });
 
