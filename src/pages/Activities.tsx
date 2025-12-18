@@ -36,6 +36,9 @@ interface DepartmentActivity {
   deadline_status: Database['public']['Enums']['deadline_status'] | null;
   updated_at: string;
   department_id: string;
+  priority: string | null;
+  created_by: string | null;
+  created_at: string | null;
   assignees?: {
     user_id: string;
     profiles?: {
@@ -172,6 +175,9 @@ const Activities = () => {
         deadline_status: activity.deadline_status,
         updated_at: activity.updated_at,
         department_id: activity.department_id,
+        priority: activity.priority,
+        created_by: activity.created_by,
+        created_at: activity.created_at,
         assignees: (assigneesData || [])
           .filter(a => a.activity_id === activity.id)
           .map(a => ({
