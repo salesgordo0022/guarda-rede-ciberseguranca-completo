@@ -101,7 +101,22 @@ export function ActivityDetailsSheet({
         goal_date: "",
         deadline: "",
         description: "",
-        priority: "media"
+        priority: "media",
+        department_id: preselectedDepartmentId || ""
+    });
+
+    // Fetch departments for selection
+    const { data: departments } = useQuery({
+        queryKey: ['departments-for-activity', selectedCompanyId],
+        queryFn: async () => {
+            if (!selectedCompanyId) return [];
+            const { data } = await supabase
+                .from('departments')
+                .select('id, name')
+                .eq('company_id', selectedCompanyId);
+            return data || [];
+        },
+        enabled: open && !!selectedCompanyId && mode === 'create' && !preselectedDepartmentId && !preselectedProjectId
     });
 
     // Checklist State
@@ -185,7 +200,8 @@ export function ActivityDetailsSheet({
                     goal_date: initialActivity.goal_date ? initialActivity.goal_date.split('T')[0] : "",
                     deadline: initialActivity.deadline ? initialActivity.deadline.split('T')[0] : "",
                     description: initialActivity.description || "",
-                    priority: initialActivity.priority || "media"
+                    priority: initialActivity.priority || "media",
+                    department_id: initialActivity.department_id || ""
                 });
             } else {
                 setFormData({
@@ -194,7 +210,8 @@ export function ActivityDetailsSheet({
                     goal_date: "",
                     deadline: "",
                     description: "",
-                    priority: "media"
+                    priority: "media",
+                    department_id: preselectedDepartmentId || ""
                 });
                 setChecklist([]);
                 setComments([]);
@@ -242,7 +259,7 @@ export function ActivityDetailsSheet({
                     activityData.project_id = preselectedProjectId;
                     delete activityData.priority;
                 } else {
-                    activityData.department_id = preselectedDepartmentId;
+                    activityData.department_id = formData.department_id || preselectedDepartmentId;
                 }
                 activityData.created_by = profile?.id;
 
@@ -520,11 +537,26 @@ export function ActivityDetailsSheet({
                                 </div>
                             </InputWrapper>
 
-                            {isDepartmentActivity && initialActivity?.department && (
+                            {isDepartmentActivity && (
                                 <InputWrapper icon={Building2} label="Departamento">
-                                    <span className="text-sm font-medium">
-                                        {initialActivity.department.name || 'Departamento'}
-                                    </span>
+                                    {mode === 'create' && !preselectedDepartmentId ? (
+                                        <Select value={formData.department_id} onValueChange={(val) => handleChange('department_id', val)}>
+                                            <SelectTrigger className="w-[180px]">
+                                                <SelectValue placeholder="Selecione..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {departments?.map((dept) => (
+                                                    <SelectItem key={dept.id} value={dept.id}>
+                                                        {dept.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    ) : (
+                                        <span className="text-sm font-medium">
+                                            {initialActivity?.department?.name || departments?.find(d => d.id === formData.department_id)?.name || 'Departamento'}
+                                        </span>
+                                    )}
                                 </InputWrapper>
                             )}
 
@@ -708,56 +740,6 @@ export function ActivityDetailsSheet({
                             </>
                         )}
 
-                        {/* Diário de Bordo Section */}
-                        {isDepartmentActivity && (
-                            <>
-                                <Separator />
-                                <div className="space-y-4">
-                                    <div className="flex items-center gap-2 text-muted-foreground font-medium">
-                                        <BookOpen className="h-4 w-4" />
-                                        Diário de Bordo
-                                    </div>
-                                    {!initialActivity?.id ? (
-                                        <p className="text-sm text-muted-foreground text-center py-4 bg-muted/30 rounded-lg">
-                                            Salve a atividade primeiro para adicionar ao diário
-                                        </p>
-                                    ) : (
-                                        <>
-                                            <div className="space-y-2">
-                                                <Textarea
-                                                    value={newNote}
-                                                    onChange={(e) => setNewNote(e.target.value)}
-                                                    placeholder="Escreva o que quiser sobre esta atividade..."
-                                                    className="min-h-[100px] resize-none"
-                                                />
-                                                <Button onClick={addNote} size="sm" variant="outline" className="gap-2">
-                                                    <Plus className="h-4 w-4" />
-                                                    Adicionar ao Diário
-                                                </Button>
-                                            </div>
-                                            <div className="space-y-3 max-h-[300px] overflow-y-auto">
-                                                {notes.map((note) => (
-                                                    <div key={note.id} className="p-3 rounded-lg border bg-card space-y-2">
-                                                        <div className="flex items-center gap-2">
-                                                            <Avatar className="h-6 w-6">
-                                                                <AvatarFallback className="text-xs bg-primary/10">
-                                                                    {getUserName(note.user_id).charAt(0).toUpperCase()}
-                                                                </AvatarFallback>
-                                                            </Avatar>
-                                                            <span className="text-sm font-medium">{getUserName(note.user_id)}</span>
-                                                            <span className="text-xs text-muted-foreground">
-                                                                {format(new Date(note.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                                                            </span>
-                                                        </div>
-                                                        <p className="text-sm whitespace-pre-wrap">{note.content}</p>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-                            </>
-                        )}
 
                         {/* History Section */}
                         {isDepartmentActivity && (
@@ -815,28 +797,6 @@ export function ActivityDetailsSheet({
                             </>
                         )}
 
-                        {/* Progress Section based on Status */}
-                        <Separator />
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between text-sm">
-                                <span className="text-muted-foreground font-medium">Progresso da Atividade</span>
-                                <span className="font-medium">{getProgressFromStatus(formData.status)}%</span>
-                            </div>
-                            <div className="h-3 bg-muted rounded-full overflow-hidden">
-                                <div 
-                                    className={`h-full transition-all ${
-                                        formData.status === 'concluida' ? 'bg-green-500' :
-                                        formData.status === 'em_andamento' ? 'bg-blue-500' :
-                                        formData.status === 'cancelada' ? 'bg-red-500' :
-                                        'bg-muted-foreground/30'
-                                    }`}
-                                    style={{ width: `${getProgressFromStatus(formData.status)}%` }}
-                                />
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                                Status: {getStatusLabel(formData.status)}
-                            </p>
-                        </div>
                     </div>
                 </ScrollArea>
             </SheetContent>
