@@ -27,63 +27,65 @@ export function useGlobalMetrics() {
   const { selectedCompanyId, profile } = useAuth();
 
   // Buscar todas as atividades (projetos + departamentos)
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['global-activities', selectedCompanyId],
     queryFn: async () => {
       if (!selectedCompanyId) return { activities: [], metrics: null };
 
-      // Buscar atividades de projetos
+      // Buscar atividades de projetos (filtrando por empresa no backend)
       const { data: projectActivities, error: paError } = await supabase
         .from('project_activities')
-        .select(`
+        .select(
+          `
           id, name, status, deadline, deadline_status, priority, description,
-          project:projects(id, name, company_id)
-        `);
+          project:projects!inner(id, name, company_id)
+        `
+        )
+        .eq('project.company_id', selectedCompanyId);
 
       if (paError) throw paError;
 
-      // Buscar atividades de departamentos
+      // Buscar atividades de departamentos (filtrando por empresa no backend)
       const { data: deptActivities, error: daError } = await supabase
         .from('department_activities')
-        .select(`
+        .select(
+          `
           id, name, status, deadline, deadline_status, priority, description,
-          department:departments(id, name, company_id)
-        `);
+          department:departments!inner(id, name, company_id)
+        `
+        )
+        .eq('department.company_id', selectedCompanyId);
 
       if (daError) throw daError;
 
-      // Filtrar por empresa e unificar
-      const projectFiltered = (projectActivities || [])
-        .filter((a: any) => a.project?.company_id === selectedCompanyId)
-        .map((a: any): UnifiedActivity => ({
-          id: a.id,
-          name: a.name,
-          status: a.status,
-          deadline: a.deadline,
-          deadline_status: a.deadline_status,
-          priority: a.priority,
-          description: a.description,
-          type: 'project',
-          source_name: a.project?.name || 'Sem projeto',
-          source_id: a.project?.id || '',
-        }));
+      // Unificar
+      const projectUnified = (projectActivities || []).map((a: any): UnifiedActivity => ({
+        id: a.id,
+        name: a.name,
+        status: a.status ?? 'pendente',
+        deadline: a.deadline,
+        deadline_status: a.deadline_status,
+        priority: a.priority,
+        description: a.description,
+        type: 'project',
+        source_name: a.project?.name || 'Sem projeto',
+        source_id: a.project?.id || '',
+      }));
 
-      const deptFiltered = (deptActivities || [])
-        .filter((a: any) => a.department?.company_id === selectedCompanyId)
-        .map((a: any): UnifiedActivity => ({
-          id: a.id,
-          name: a.name,
-          status: a.status,
-          deadline: a.deadline,
-          deadline_status: a.deadline_status,
-          priority: a.priority,
-          description: a.description,
-          type: 'department',
-          source_name: a.department?.name || 'Sem departamento',
-          source_id: a.department?.id || '',
-        }));
+      const deptUnified = (deptActivities || []).map((a: any): UnifiedActivity => ({
+        id: a.id,
+        name: a.name,
+        status: a.status ?? 'pendente',
+        deadline: a.deadline,
+        deadline_status: a.deadline_status,
+        priority: a.priority,
+        description: a.description,
+        type: 'department',
+        source_name: a.department?.name || 'Sem departamento',
+        source_id: a.department?.id || '',
+      }));
 
-      const allActivities = [...projectFiltered, ...deptFiltered];
+      const allActivities = [...projectUnified, ...deptUnified];
 
       const metrics: GlobalMetrics = {
         total: allActivities.length,
