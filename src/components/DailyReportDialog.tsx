@@ -176,16 +176,16 @@ export function DailyReportDialog() {
     return (
         <Dialog>
             <DialogTrigger asChild>
-                <Button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white">
-                    <Trophy className="h-4 w-4 mr-2" />
-                    Gamificação
+                <Button variant="outline" className="gap-2">
+                    <FileText className="h-4 w-4" />
+                    Relatório Diário
                 </Button>
             </DialogTrigger>
             <DialogContent className="max-w-[95vw] md:max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle className="text-xl md:text-2xl font-bold flex items-center gap-2">
-                        <Trophy className="h-6 w-6 text-yellow-500" />
-                        Ranking de Produtividade
+                        <FileText className="h-6 w-6 text-primary" />
+                        Relatório Diário - Produtividade e Desempenho
                     </DialogTitle>
                 </DialogHeader>
 
