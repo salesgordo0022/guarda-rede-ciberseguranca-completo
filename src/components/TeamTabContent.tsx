@@ -98,6 +98,7 @@ const createUserSchema = z.object({
     firstName: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
     lastName: z.string().min(2, "Sobrenome deve ter pelo menos 2 caracteres"),
     email: z.string().email("Email inválido"),
+    password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
     department_ids: z.array(z.string()).optional(),
     role: z.enum(["admin", "gestor", "colaborador"], {
         required_error: "Selecione um tipo de usuário",
@@ -132,6 +133,7 @@ export const TeamTabContent = () => {
             firstName: "",
             lastName: "",
             email: "",
+            password: "",
             department_ids: [],
             role: "colaborador",
         },
@@ -250,6 +252,7 @@ export const TeamTabContent = () => {
                     companyId: selectedCompanyId,
                     role: values.role,
                     departmentIds: selectedDepartments,
+                    password: values.password,
                 },
             });
 
@@ -465,8 +468,22 @@ export const TeamTabContent = () => {
                                             <FormControl>
                                                 <Input type="email" placeholder="joao.silva@empresa.com" {...field} />
                                             </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={form.control}
+                                    name="password"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Senha</FormLabel>
+                                            <FormControl>
+                                                <Input type="password" placeholder="Mínimo 6 caracteres" {...field} />
+                                            </FormControl>
                                             <FormDescription>
-                                                O usuário receberá um email para definir a senha
+                                                Defina a senha inicial do usuário
                                             </FormDescription>
                                             <FormMessage />
                                         </FormItem>

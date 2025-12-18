@@ -1,1 +1,7 @@
-project_id = "axfudcrhiltcultdkkvs"
+project_id = "okqxbemtbnokflqtqjds"
+
+[functions.create-team-member]
+verify_jwt = false
+
+[functions.update-team-member]
+verify_jwt = false
