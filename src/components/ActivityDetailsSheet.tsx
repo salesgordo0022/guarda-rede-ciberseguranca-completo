@@ -18,6 +18,20 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from "@/components/ui/command";
+import { Badge } from "@/components/ui/badge";
+import {
     Calendar,
     User,
     Building2,
@@ -35,6 +49,8 @@ import {
     Flag,
     Send,
     Users,
+    X,
+    Check,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -754,38 +770,79 @@ export function ActivityDetailsSheet({
                                     Responsáveis
                                 </div>
                                 <div className="space-y-2">
-                                    <div className="border rounded-lg p-2 max-h-40 overflow-y-auto space-y-1">
-                                        {teamMembers.length === 0 ? (
-                                            <p className="text-sm text-muted-foreground text-center py-2">
-                                                Nenhum membro encontrado
-                                            </p>
-                                        ) : (
-                                            teamMembers.map((member) => (
-                                                <div
-                                                    key={member.id}
-                                                    className="flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer"
-                                                    onClick={() => toggleAssignee(member.id)}
-                                                >
-                                                    <Checkbox
-                                                        checked={selectedAssignees.includes(member.id)}
-                                                        onCheckedChange={() => toggleAssignee(member.id)}
-                                                    />
-                                                    <Avatar className="h-6 w-6">
-                                                        <AvatarImage src={member.avatar_url || undefined} />
-                                                        <AvatarFallback className="text-xs bg-primary text-primary-foreground">
-                                                            {member.full_name?.substring(0, 2).toUpperCase() || 'US'}
-                                                        </AvatarFallback>
-                                                    </Avatar>
-                                                    <span className="text-sm truncate">{member.full_name}</span>
-                                                </div>
-                                            ))
-                                        )}
-                                    </div>
-                                    {selectedAssignees.length > 0 && (
-                                        <p className="text-xs text-muted-foreground">
-                                            {selectedAssignees.length} responsável(eis) selecionado(s)
-                                        </p>
-                                    )}
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <div className="min-h-[42px] w-full border rounded-lg p-2 cursor-pointer hover:bg-muted/50 transition-colors">
+                                                {selectedAssignees.length === 0 ? (
+                                                    <span className="text-sm text-muted-foreground">Selecione quantas quiser</span>
+                                                ) : (
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {selectedAssignees.map((userId) => {
+                                                            const member = teamMembers.find(m => m.id === userId);
+                                                            if (!member) return null;
+                                                            return (
+                                                                <Badge
+                                                                    key={userId}
+                                                                    variant="secondary"
+                                                                    className="flex items-center gap-1 pr-1"
+                                                                >
+                                                                    <Avatar className="h-4 w-4">
+                                                                        <AvatarImage src={member.avatar_url || undefined} />
+                                                                        <AvatarFallback className="text-[10px] bg-primary text-primary-foreground">
+                                                                            {member.full_name?.charAt(0).toUpperCase() || 'U'}
+                                                                        </AvatarFallback>
+                                                                    </Avatar>
+                                                                    <span className="max-w-[150px] truncate">{member.full_name}</span>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            toggleAssignee(userId);
+                                                                        }}
+                                                                        className="ml-1 rounded-full hover:bg-destructive/20 p-0.5"
+                                                                    >
+                                                                        <X className="h-3 w-3" />
+                                                                    </button>
+                                                                </Badge>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-[300px] p-0 bg-popover" align="start">
+                                            <Command>
+                                                <CommandInput placeholder="Buscar membro..." />
+                                                <CommandList>
+                                                    <CommandEmpty>Nenhum membro encontrado.</CommandEmpty>
+                                                    <CommandGroup>
+                                                        {teamMembers.map((member) => {
+                                                            const isSelected = selectedAssignees.includes(member.id);
+                                                            return (
+                                                                <CommandItem
+                                                                    key={member.id}
+                                                                    value={member.full_name}
+                                                                    onSelect={() => toggleAssignee(member.id)}
+                                                                    className="flex items-center gap-2 cursor-pointer"
+                                                                >
+                                                                    <Avatar className="h-6 w-6">
+                                                                        <AvatarImage src={member.avatar_url || undefined} />
+                                                                        <AvatarFallback className="text-xs bg-primary text-primary-foreground">
+                                                                            {member.full_name?.charAt(0).toUpperCase() || 'U'}
+                                                                        </AvatarFallback>
+                                                                    </Avatar>
+                                                                    <span className="flex-1 truncate">{member.full_name}</span>
+                                                                    {isSelected && (
+                                                                        <Check className="h-4 w-4 text-primary" />
+                                                                    )}
+                                                                </CommandItem>
+                                                            );
+                                                        })}
+                                                    </CommandGroup>
+                                                </CommandList>
+                                            </Command>
+                                        </PopoverContent>
+                                    </Popover>
                                 </div>
                             </div>
 
