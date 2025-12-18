@@ -112,6 +112,12 @@ export function CreateProjectDialog({ open: controlledOpen, onOpenChange: setCon
             toast.error("Erro: Empresa ou usuário não identificado");
             return;
         }
+        
+        // Validação: pelo menos 1 participante deve ser selecionado
+        if (selectedMembers.length === 0 && teamMembers.length > 0) {
+            toast.error("Selecione pelo menos 1 participante para o projeto");
+            return;
+        }
 
         setLoading(true);
         try {
@@ -215,7 +221,7 @@ export function CreateProjectDialog({ open: controlledOpen, onOpenChange: setCon
                         <div className="flex items-center justify-between">
                             <Label className="flex items-center gap-2">
                                 <Users className="h-4 w-4" />
-                                Membros do Projeto
+                                Membros do Projeto *
                             </Label>
                             {teamMembers.length > 0 && (
                                 <Button
@@ -229,7 +235,7 @@ export function CreateProjectDialog({ open: controlledOpen, onOpenChange: setCon
                             )}
                         </div>
                         <p className="text-xs text-muted-foreground">
-                            Selecione quem terá acesso a este projeto. Administradores sempre têm acesso.
+                            Selecione quem terá acesso a este projeto (obrigatório). Administradores sempre têm acesso.
                         </p>
                         <ScrollArea className="h-[200px] border rounded-lg p-3">
                             {teamMembers.length === 0 ? (
