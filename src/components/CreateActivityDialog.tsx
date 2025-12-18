@@ -53,8 +53,9 @@ export function CreateActivityDialog({ open: controlledOpen, onOpenChange: setCo
     
     // Recurrence states
     const [isRecurring, setIsRecurring] = useState(false);
-    const [recurrenceType, setRecurrenceType] = useState<"daily" | "weekly" | "monthly">("weekly");
+    const [recurrenceType, setRecurrenceType] = useState<"daily" | "weekly" | "monthly" | "yearly">("weekly");
     const [recurrenceDay, setRecurrenceDay] = useState<number>(1);
+    const [recurrenceMonth, setRecurrenceMonth] = useState<number>(1);
 
     // Update departmentId if preselected changes
     useEffect(() => {
@@ -142,6 +143,7 @@ export function CreateActivityDialog({ open: controlledOpen, onOpenChange: setCo
                     is_recurring: isRecurring,
                     recurrence_type: isRecurring ? recurrenceType : null,
                     recurrence_day: isRecurring ? recurrenceDay : null,
+                    recurrence_month: isRecurring && recurrenceType === 'yearly' ? recurrenceMonth : null,
                     recurrence_active: isRecurring,
                 })
                 .select()
@@ -180,6 +182,7 @@ export function CreateActivityDialog({ open: controlledOpen, onOpenChange: setCo
             setIsRecurring(false);
             setRecurrenceType("weekly");
             setRecurrenceDay(1);
+            setRecurrenceMonth(1);
 
             queryClient.invalidateQueries({ queryKey: ['department-activities'] });
         } catch (error: any) {
@@ -347,10 +350,11 @@ export function CreateActivityDialog({ open: controlledOpen, onOpenChange: setCo
                             <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
                                 <div className="space-y-2">
                                     <Label>Frequência</Label>
-                                    <Select value={recurrenceType} onValueChange={(value: "daily" | "weekly" | "monthly") => {
+                                    <Select value={recurrenceType} onValueChange={(value: "daily" | "weekly" | "monthly" | "yearly") => {
                                         setRecurrenceType(value);
                                         if (value === 'weekly') setRecurrenceDay(1);
                                         if (value === 'monthly') setRecurrenceDay(1);
+                                        if (value === 'yearly') { setRecurrenceDay(1); setRecurrenceMonth(1); }
                                     }}>
                                         <SelectTrigger>
                                             <SelectValue />
@@ -359,6 +363,7 @@ export function CreateActivityDialog({ open: controlledOpen, onOpenChange: setCo
                                             <SelectItem value="daily">Diária</SelectItem>
                                             <SelectItem value="weekly">Semanal</SelectItem>
                                             <SelectItem value="monthly">Mensal</SelectItem>
+                                            <SelectItem value="yearly">Anual</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -401,10 +406,53 @@ export function CreateActivityDialog({ open: controlledOpen, onOpenChange: setCo
                                     </div>
                                 )}
 
+                                {recurrenceType === 'yearly' && (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label>Mês</Label>
+                                            <Select value={String(recurrenceMonth)} onValueChange={(v) => setRecurrenceMonth(Number(v))}>
+                                                <SelectTrigger>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="1">Janeiro</SelectItem>
+                                                    <SelectItem value="2">Fevereiro</SelectItem>
+                                                    <SelectItem value="3">Março</SelectItem>
+                                                    <SelectItem value="4">Abril</SelectItem>
+                                                    <SelectItem value="5">Maio</SelectItem>
+                                                    <SelectItem value="6">Junho</SelectItem>
+                                                    <SelectItem value="7">Julho</SelectItem>
+                                                    <SelectItem value="8">Agosto</SelectItem>
+                                                    <SelectItem value="9">Setembro</SelectItem>
+                                                    <SelectItem value="10">Outubro</SelectItem>
+                                                    <SelectItem value="11">Novembro</SelectItem>
+                                                    <SelectItem value="12">Dezembro</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Dia</Label>
+                                            <Select value={String(recurrenceDay)} onValueChange={(v) => setRecurrenceDay(Number(v))}>
+                                                <SelectTrigger>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                                                        <SelectItem key={day} value={String(day)}>
+                                                            Dia {day}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
+                                )}
+
                                 <p className="text-xs text-muted-foreground">
                                     {recurrenceType === 'daily' && 'Uma nova atividade será criada todos os dias automaticamente.'}
                                     {recurrenceType === 'weekly' && `Uma nova atividade será criada toda ${['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'][recurrenceDay]}.`}
                                     {recurrenceType === 'monthly' && `Uma nova atividade será criada todo dia ${recurrenceDay} de cada mês.`}
+                                    {recurrenceType === 'yearly' && `Uma nova atividade será criada todo dia ${recurrenceDay} de ${['', 'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'][recurrenceMonth]}.`}
                                 </p>
                             </div>
                         )}

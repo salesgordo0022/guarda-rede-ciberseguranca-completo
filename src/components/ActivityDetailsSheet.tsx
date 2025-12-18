@@ -136,8 +136,9 @@ export function ActivityDetailsSheet({
         priority: "media",
         department_id: preselectedDepartmentId || "",
         is_recurring: false,
-        recurrence_type: "weekly" as "daily" | "weekly" | "monthly",
+        recurrence_type: "weekly" as "daily" | "weekly" | "monthly" | "yearly",
         recurrence_day: 1,
+        recurrence_month: 1,
         recurrence_active: true
     });
 
@@ -286,6 +287,7 @@ export function ActivityDetailsSheet({
                     is_recurring: initialActivity.is_recurring || false,
                     recurrence_type: initialActivity.recurrence_type || "weekly",
                     recurrence_day: initialActivity.recurrence_day ?? 1,
+                    recurrence_month: initialActivity.recurrence_month ?? 1,
                     recurrence_active: initialActivity.recurrence_active ?? true
                 });
                 // Assignees serão carregados pelo fetchActivityData
@@ -301,6 +303,7 @@ export function ActivityDetailsSheet({
                     is_recurring: false,
                     recurrence_type: "weekly",
                     recurrence_day: 1,
+                    recurrence_month: 1,
                     recurrence_active: true
                 });
                 setSelectedAssignees([]);
@@ -355,6 +358,7 @@ export function ActivityDetailsSheet({
                     is_recurring: formData.is_recurring,
                     recurrence_type: formData.is_recurring ? formData.recurrence_type : null,
                     recurrence_day: formData.is_recurring ? formData.recurrence_day : null,
+                    recurrence_month: formData.is_recurring && formData.recurrence_type === 'yearly' ? formData.recurrence_month : null,
                     recurrence_active: formData.is_recurring ? formData.recurrence_active : false
                 })
             };
@@ -1010,10 +1014,11 @@ export function ActivityDetailsSheet({
                                                 <label className="text-sm font-medium">Frequência</label>
                                                 <Select 
                                                     value={formData.recurrence_type} 
-                                                    onValueChange={(value: "daily" | "weekly" | "monthly") => {
+                                                    onValueChange={(value: "daily" | "weekly" | "monthly" | "yearly") => {
                                                         handleChange('recurrence_type', value);
                                                         if (value === 'weekly') handleChange('recurrence_day', 1);
                                                         if (value === 'monthly') handleChange('recurrence_day', 1);
+                                                        if (value === 'yearly') { handleChange('recurrence_day', 1); handleChange('recurrence_month', 1); }
                                                     }}
                                                 >
                                                     <SelectTrigger className="w-full">
@@ -1023,6 +1028,7 @@ export function ActivityDetailsSheet({
                                                         <SelectItem value="daily">Diária</SelectItem>
                                                         <SelectItem value="weekly">Semanal</SelectItem>
                                                         <SelectItem value="monthly">Mensal</SelectItem>
+                                                        <SelectItem value="yearly">Anual</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             </div>
@@ -1071,10 +1077,59 @@ export function ActivityDetailsSheet({
                                                 </div>
                                             )}
 
+                                            {formData.recurrence_type === 'yearly' && (
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="space-y-2">
+                                                        <label className="text-sm font-medium">Mês</label>
+                                                        <Select 
+                                                            value={String(formData.recurrence_month)} 
+                                                            onValueChange={(v) => handleChange('recurrence_month', Number(v))}
+                                                        >
+                                                            <SelectTrigger className="w-full">
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="1">Janeiro</SelectItem>
+                                                                <SelectItem value="2">Fevereiro</SelectItem>
+                                                                <SelectItem value="3">Março</SelectItem>
+                                                                <SelectItem value="4">Abril</SelectItem>
+                                                                <SelectItem value="5">Maio</SelectItem>
+                                                                <SelectItem value="6">Junho</SelectItem>
+                                                                <SelectItem value="7">Julho</SelectItem>
+                                                                <SelectItem value="8">Agosto</SelectItem>
+                                                                <SelectItem value="9">Setembro</SelectItem>
+                                                                <SelectItem value="10">Outubro</SelectItem>
+                                                                <SelectItem value="11">Novembro</SelectItem>
+                                                                <SelectItem value="12">Dezembro</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <label className="text-sm font-medium">Dia</label>
+                                                        <Select 
+                                                            value={String(formData.recurrence_day)} 
+                                                            onValueChange={(v) => handleChange('recurrence_day', Number(v))}
+                                                        >
+                                                            <SelectTrigger className="w-full">
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                                                                    <SelectItem key={day} value={String(day)}>
+                                                                        Dia {day}
+                                                                    </SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                </div>
+                                            )}
+
                                             <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
                                                 {formData.recurrence_type === 'daily' && '📅 Uma nova atividade será criada todos os dias automaticamente.'}
                                                 {formData.recurrence_type === 'weekly' && `📅 Uma nova atividade será criada toda ${['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'][formData.recurrence_day]}.`}
                                                 {formData.recurrence_type === 'monthly' && `📅 Uma nova atividade será criada todo dia ${formData.recurrence_day} de cada mês.`}
+                                                {formData.recurrence_type === 'yearly' && `📅 Uma nova atividade será criada todo dia ${formData.recurrence_day} de ${['', 'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'][formData.recurrence_month]}.`}
                                             </p>
 
                                             {mode === 'view' && initialActivity?.is_recurring && (

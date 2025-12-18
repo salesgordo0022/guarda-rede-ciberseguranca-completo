@@ -66,6 +66,7 @@ export type Database = {
           priority: string | null
           recurrence_active: boolean | null
           recurrence_day: number | null
+          recurrence_month: number | null
           recurrence_type: string | null
           scheduled_date: string | null
           status: Database["public"]["Enums"]["activity_status"] | null
@@ -91,6 +92,7 @@ export type Database = {
           priority?: string | null
           recurrence_active?: boolean | null
           recurrence_day?: number | null
+          recurrence_month?: number | null
           recurrence_type?: string | null
           scheduled_date?: string | null
           status?: Database["public"]["Enums"]["activity_status"] | null
@@ -116,6 +118,7 @@ export type Database = {
           priority?: string | null
           recurrence_active?: boolean | null
           recurrence_day?: number | null
+          recurrence_month?: number | null
           recurrence_type?: string | null
           scheduled_date?: string | null
           status?: Database["public"]["Enums"]["activity_status"] | null
