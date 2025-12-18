@@ -6,14 +6,24 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { Users } from "lucide-react";
 
 interface Department {
     id: string;
     name: string;
+}
+
+interface TeamMember {
+    id: string;
+    full_name: string;
+    email: string;
+    avatar_url: string | null;
 }
 
 interface CreateActivityDialogProps {
@@ -37,6 +47,7 @@ export function CreateActivityDialog({ open: controlledOpen, onOpenChange: setCo
     const [scheduleStart, setScheduleStart] = useState("");
     const [scheduleEnd, setScheduleEnd] = useState("");
     const [priority, setPriority] = useState<"urgente" | "media_urgencia" | "nao_urgente">("nao_urgente");
+    const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
     const [loading, setLoading] = useState(false);
 
     // Update departmentId if preselected changes
@@ -58,8 +69,43 @@ export function CreateActivityDialog({ open: controlledOpen, onOpenChange: setCo
                 .order('name');
             return data as Department[] || [];
         },
-        enabled: !!selectedCompanyId && open // Fetch when open
+        enabled: !!selectedCompanyId && open
     });
+
+    // Fetch team members from the company
+    const { data: teamMembers = [] } = useQuery({
+        queryKey: ['team-members', selectedCompanyId],
+        queryFn: async () => {
+            if (!selectedCompanyId) return [];
+            
+            // Get user IDs from user_companies
+            const { data: userCompanies } = await supabase
+                .from('user_companies')
+                .select('user_id')
+                .eq('company_id', selectedCompanyId);
+            
+            if (!userCompanies || userCompanies.length === 0) return [];
+            
+            const userIds = userCompanies.map(uc => uc.user_id);
+            
+            // Get profiles for those users
+            const { data: profiles } = await supabase
+                .from('profiles')
+                .select('id, full_name, email, avatar_url')
+                .in('id', userIds);
+            
+            return (profiles || []) as TeamMember[];
+        },
+        enabled: !!selectedCompanyId && open
+    });
+
+    const toggleAssignee = (userId: string) => {
+        setSelectedAssignees(prev => 
+            prev.includes(userId) 
+                ? prev.filter(id => id !== userId)
+                : [...prev, userId]
+        );
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -75,20 +121,39 @@ export function CreateActivityDialog({ open: controlledOpen, onOpenChange: setCo
 
         setLoading(true);
         try {
-            const { error } = await supabase
+            // Create the activity
+            const { data: newActivity, error } = await supabase
                 .from('department_activities')
                 .insert({
                     name,
                     description: description || null,
                     department_id: departmentId,
                     deadline: deadline || null,
-                    schedule_start: scheduleStart || null,
-                    schedule_end: scheduleEnd || null,
+                    scheduled_date: scheduleStart || null,
+                    goal_date: scheduleEnd || null,
                     priority: priority,
                     created_by: profile.id,
-                });
+                })
+                .select()
+                .single();
 
             if (error) throw error;
+
+            // Add assignees if any selected
+            if (selectedAssignees.length > 0 && newActivity) {
+                const assigneesData = selectedAssignees.map(userId => ({
+                    activity_id: newActivity.id,
+                    user_id: userId
+                }));
+
+                const { error: assigneesError } = await supabase
+                    .from('department_activity_assignees')
+                    .insert(assigneesData);
+
+                if (assigneesError) {
+                    console.error('Erro ao adicionar responsáveis:', assigneesError);
+                }
+            }
 
             toast.success("Atividade criada com sucesso!");
             setOpen(false);
@@ -101,6 +166,7 @@ export function CreateActivityDialog({ open: controlledOpen, onOpenChange: setCo
             setScheduleStart("");
             setScheduleEnd("");
             setPriority("nao_urgente");
+            setSelectedAssignees([]);
 
             queryClient.invalidateQueries({ queryKey: ['department-activities'] });
         } catch (error: any) {
@@ -113,7 +179,7 @@ export function CreateActivityDialog({ open: controlledOpen, onOpenChange: setCo
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-            <DialogContent>
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Criar Nova Atividade</DialogTitle>
                 </DialogHeader>
@@ -159,6 +225,49 @@ export function CreateActivityDialog({ open: controlledOpen, onOpenChange: setCo
                             className="resize-none"
                             rows={3}
                         />
+                    </div>
+
+                    {/* Assignees Section */}
+                    <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                            <Users className="h-4 w-4" />
+                            Responsáveis
+                        </Label>
+                        <div className="border rounded-lg p-3 max-h-40 overflow-y-auto space-y-2">
+                            {teamMembers.length === 0 ? (
+                                <p className="text-sm text-muted-foreground text-center py-2">
+                                    Nenhum membro encontrado
+                                </p>
+                            ) : (
+                                teamMembers.map((member) => (
+                                    <div
+                                        key={member.id}
+                                        className="flex items-center gap-3 p-2 rounded-md hover:bg-muted cursor-pointer"
+                                        onClick={() => toggleAssignee(member.id)}
+                                    >
+                                        <Checkbox
+                                            checked={selectedAssignees.includes(member.id)}
+                                            onCheckedChange={() => toggleAssignee(member.id)}
+                                        />
+                                        <Avatar className="h-8 w-8">
+                                            <AvatarImage src={member.avatar_url || undefined} />
+                                            <AvatarFallback className="text-xs bg-primary text-primary-foreground">
+                                                {member.full_name?.substring(0, 2).toUpperCase() || 'US'}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-medium truncate">{member.full_name}</p>
+                                            <p className="text-xs text-muted-foreground truncate">{member.email}</p>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                        {selectedAssignees.length > 0 && (
+                            <p className="text-xs text-muted-foreground">
+                                {selectedAssignees.length} responsável(eis) selecionado(s)
+                            </p>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
