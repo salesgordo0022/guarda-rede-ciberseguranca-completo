@@ -41,6 +41,7 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { MultiSelect } from "@/components/ui/multi-select";
+import { useLoading } from "@/contexts/LoadingContext";
 
 interface TeamMember {
     id: string;
@@ -123,6 +124,7 @@ export const TeamTabContent = () => {
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const { selectedCompanyId } = useAuth();
+    const { showLoading, hideLoading } = useLoading();
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editDialogOpen, setEditDialogOpen] = useState(false);
     const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
@@ -435,7 +437,11 @@ export const TeamTabContent = () => {
 
             return response.data;
         },
+        onMutate: () => {
+            showLoading("Salvando alterações...");
+        },
         onSuccess: () => {
+            hideLoading();
             queryClient.invalidateQueries({ queryKey: ["team-members"] });
             queryClient.invalidateQueries({ queryKey: ["projects"] });
             toast({
@@ -450,6 +456,7 @@ export const TeamTabContent = () => {
             setEditProjects([]);
         },
         onError: (error: any) => {
+            hideLoading();
             toast({
                 title: "Erro ao atualizar usuário",
                 description: error.message,
