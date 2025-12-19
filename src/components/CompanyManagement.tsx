@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -9,6 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
     Table,
     TableBody,
@@ -48,7 +51,7 @@ import {
     AccordionItem,
     AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Building2, Users, Shield, UserPlus, Trash2, Pencil, Crown, Search } from "lucide-react";
+import { Building2, Users, Shield, Trash2, Pencil, Crown, Search, FolderKanban, Layers } from "lucide-react";
 import { toast } from "sonner";
 import { Database } from "@/integrations/supabase/types";
 
@@ -78,6 +81,18 @@ interface Company {
     created_at: string;
 }
 
+interface Department {
+    id: string;
+    name: string;
+    description: string | null;
+}
+
+interface Project {
+    id: string;
+    name: string;
+    description: string | null;
+}
+
 const roleLabels: Record<AppRole, string> = {
     admin: "Administrador",
     gestor: "Gestor",
@@ -99,6 +114,10 @@ export function CompanyManagement() {
     const [newRole, setNewRole] = useState<AppRole>("colaborador");
     const [removingMember, setRemovingMember] = useState<CompanyMember | null>(null);
     const [searchTerm, setSearchTerm] = useState("");
+    
+    // Estados para seleção de departamentos e projetos
+    const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
+    const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
 
     // Buscar todas as empresas que o usuário tem acesso
     const { data: companies, isLoading: loadingCompanies } = useQuery({
@@ -169,26 +188,171 @@ export function CompanyManagement() {
         enabled: !!selectedCompany?.id,
     });
 
-    // Mutation para atualizar role
-    const updateRoleMutation = useMutation({
-        mutationFn: async ({ memberId, role }: { memberId: string; role: AppRole }) => {
-            showLoading("Atualizando nível de acesso...");
-            const { error } = await supabase
+    // Buscar departamentos da empresa selecionada
+    const { data: companyDepartments } = useQuery({
+        queryKey: ["company-departments", selectedCompany?.id],
+        queryFn: async () => {
+            if (!selectedCompany?.id) return [];
+
+            const { data, error } = await supabase
+                .from("departments")
+                .select("id, name, description")
+                .eq("company_id", selectedCompany.id)
+                .order("name");
+
+            if (error) throw error;
+            return data as Department[];
+        },
+        enabled: !!selectedCompany?.id,
+    });
+
+    // Buscar projetos da empresa selecionada
+    const { data: companyProjects } = useQuery({
+        queryKey: ["company-projects", selectedCompany?.id],
+        queryFn: async () => {
+            if (!selectedCompany?.id) return [];
+
+            const { data, error } = await supabase
+                .from("projects")
+                .select("id, name, description")
+                .eq("company_id", selectedCompany.id)
+                .order("name");
+
+            if (error) throw error;
+            return data as Project[];
+        },
+        enabled: !!selectedCompany?.id,
+    });
+
+    // Buscar departamentos do membro sendo editado
+    const { data: memberDepartments, refetch: refetchMemberDepartments } = useQuery({
+        queryKey: ["member-departments", editingMember?.user_id, selectedCompany?.id],
+        queryFn: async () => {
+            if (!editingMember?.user_id || !selectedCompany?.id) return [];
+
+            const { data, error } = await supabase
+                .from("user_departments")
+                .select("department_id")
+                .eq("user_id", editingMember.user_id);
+
+            if (error) throw error;
+
+            // Filtrar apenas departamentos da empresa atual
+            const deptIds = data?.map(d => d.department_id) || [];
+            const companyDeptIds = companyDepartments?.map(d => d.id) || [];
+            return deptIds.filter(id => companyDeptIds.includes(id));
+        },
+        enabled: !!editingMember?.user_id && !!selectedCompany?.id && !!companyDepartments,
+    });
+
+    // Buscar projetos do membro sendo editado
+    const { data: memberProjects, refetch: refetchMemberProjects } = useQuery({
+        queryKey: ["member-projects", editingMember?.user_id, selectedCompany?.id],
+        queryFn: async () => {
+            if (!editingMember?.user_id || !selectedCompany?.id) return [];
+
+            const { data, error } = await supabase
+                .from("project_members")
+                .select("project_id")
+                .eq("user_id", editingMember.user_id);
+
+            if (error) throw error;
+
+            // Filtrar apenas projetos da empresa atual
+            const projIds = data?.map(p => p.project_id) || [];
+            const companyProjIds = companyProjects?.map(p => p.id) || [];
+            return projIds.filter(id => companyProjIds.includes(id));
+        },
+        enabled: !!editingMember?.user_id && !!selectedCompany?.id && !!companyProjects,
+    });
+
+    // Atualizar seleções quando o membro mudar
+    useEffect(() => {
+        if (memberDepartments) {
+            setSelectedDepartments(memberDepartments);
+        }
+    }, [memberDepartments]);
+
+    useEffect(() => {
+        if (memberProjects) {
+            setSelectedProjects(memberProjects);
+        }
+    }, [memberProjects]);
+
+    // Mutation para atualizar role, departamentos e projetos
+    const updateMemberAccessMutation = useMutation({
+        mutationFn: async ({ 
+            memberId, 
+            userId,
+            role, 
+            departments, 
+            projects 
+        }: { 
+            memberId: string; 
+            userId: string;
+            role: AppRole; 
+            departments: string[]; 
+            projects: string[];
+        }) => {
+            showLoading("Atualizando acessos...");
+
+            // Atualizar role
+            const { error: roleError } = await supabase
                 .from("user_companies")
                 .update({ role })
                 .eq("id", memberId);
 
-            if (error) throw error;
+            if (roleError) throw roleError;
+
+            // Atualizar departamentos - remover todos e adicionar novamente
+            const { error: deleteDeptError } = await supabase
+                .from("user_departments")
+                .delete()
+                .eq("user_id", userId)
+                .in("department_id", companyDepartments?.map(d => d.id) || []);
+
+            if (deleteDeptError) throw deleteDeptError;
+
+            if (departments.length > 0) {
+                const { error: insertDeptError } = await supabase
+                    .from("user_departments")
+                    .insert(departments.map(deptId => ({
+                        user_id: userId,
+                        department_id: deptId,
+                    })));
+
+                if (insertDeptError) throw insertDeptError;
+            }
+
+            // Atualizar projetos - remover todos e adicionar novamente
+            const { error: deleteProjError } = await supabase
+                .from("project_members")
+                .delete()
+                .eq("user_id", userId)
+                .in("project_id", companyProjects?.map(p => p.id) || []);
+
+            if (deleteProjError) throw deleteProjError;
+
+            if (projects.length > 0) {
+                const { error: insertProjError } = await supabase
+                    .from("project_members")
+                    .insert(projects.map(projId => ({
+                        user_id: userId,
+                        project_id: projId,
+                    })));
+
+                if (insertProjError) throw insertProjError;
+            }
         },
         onSuccess: () => {
             hideLoading();
             queryClient.invalidateQueries({ queryKey: ["company-members", selectedCompany?.id] });
-            toast.success("Nível de acesso atualizado com sucesso!");
+            toast.success("Acessos atualizados com sucesso!");
             setEditingMember(null);
         },
         onError: (error: any) => {
             hideLoading();
-            toast.error("Erro ao atualizar nível de acesso: " + error.message);
+            toast.error("Erro ao atualizar acessos: " + error.message);
         },
     });
 
@@ -228,6 +392,29 @@ export function CompanyManagement() {
     const canManageCompany = (companyId: string) => {
         const role = getUserRoleInCompany(companyId);
         return role === "admin";
+    };
+
+    const handleToggleDepartment = (deptId: string) => {
+        setSelectedDepartments(prev =>
+            prev.includes(deptId)
+                ? prev.filter(id => id !== deptId)
+                : [...prev, deptId]
+        );
+    };
+
+    const handleToggleProject = (projId: string) => {
+        setSelectedProjects(prev =>
+            prev.includes(projId)
+                ? prev.filter(id => id !== projId)
+                : [...prev, projId]
+        );
+    };
+
+    const handleOpenEditModal = (member: CompanyMember) => {
+        setEditingMember(member);
+        setNewRole(member.role);
+        setSelectedDepartments([]);
+        setSelectedProjects([]);
     };
 
     if (loadingCompanies) {
@@ -363,10 +550,7 @@ export function CompanyManagement() {
                                                                     <Button
                                                                         variant="ghost"
                                                                         size="sm"
-                                                                        onClick={() => {
-                                                                            setEditingMember(member);
-                                                                            setNewRole(member.role);
-                                                                        }}
+                                                                        onClick={() => handleOpenEditModal(member)}
                                                                         disabled={member.user_id === company.created_by}
                                                                     >
                                                                         <Pencil className="h-4 w-4" />
@@ -445,11 +629,11 @@ export function CompanyManagement() {
 
             {/* Dialog para editar nível de acesso */}
             <Dialog open={!!editingMember} onOpenChange={() => setEditingMember(null)}>
-                <DialogContent>
+                <DialogContent className="sm:max-w-[600px]">
                     <DialogHeader>
-                        <DialogTitle>Alterar Nível de Acesso</DialogTitle>
+                        <DialogTitle>Alterar Acessos</DialogTitle>
                         <DialogDescription>
-                            Altere o nível de acesso de {editingMember?.profile?.full_name} nesta empresa
+                            Configure o nível de acesso e permissões de {editingMember?.profile?.full_name}
                         </DialogDescription>
                     </DialogHeader>
 
@@ -467,34 +651,148 @@ export function CompanyManagement() {
                             </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Novo Nível de Acesso</label>
-                            <Select value={newRole} onValueChange={(v) => setNewRole(v as AppRole)}>
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="admin">
-                                        <div className="flex items-center gap-2">
-                                            <Badge className={roleBadgeColors.admin}>Admin</Badge>
-                                            <span>Acesso total</span>
-                                        </div>
-                                    </SelectItem>
-                                    <SelectItem value="gestor">
-                                        <div className="flex items-center gap-2">
-                                            <Badge className={roleBadgeColors.gestor}>Gestor</Badge>
-                                            <span>Gerenciar projetos</span>
-                                        </div>
-                                    </SelectItem>
-                                    <SelectItem value="colaborador">
-                                        <div className="flex items-center gap-2">
-                                            <Badge className={roleBadgeColors.colaborador}>Colaborador</Badge>
-                                            <span>Acesso básico</span>
-                                        </div>
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
+                        <Tabs defaultValue="role" className="w-full">
+                            <TabsList className="grid w-full grid-cols-3">
+                                <TabsTrigger value="role" className="flex items-center gap-2">
+                                    <Shield className="h-4 w-4" />
+                                    Nível
+                                </TabsTrigger>
+                                <TabsTrigger value="departments" className="flex items-center gap-2">
+                                    <Layers className="h-4 w-4" />
+                                    Departamentos
+                                </TabsTrigger>
+                                <TabsTrigger value="projects" className="flex items-center gap-2">
+                                    <FolderKanban className="h-4 w-4" />
+                                    Projetos
+                                </TabsTrigger>
+                            </TabsList>
+
+                            <TabsContent value="role" className="space-y-4 mt-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Nível de Acesso</label>
+                                    <Select value={newRole} onValueChange={(v) => setNewRole(v as AppRole)}>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="admin">
+                                                <div className="flex items-center gap-2">
+                                                    <Badge className={roleBadgeColors.admin}>Admin</Badge>
+                                                    <span>Acesso total</span>
+                                                </div>
+                                            </SelectItem>
+                                            <SelectItem value="gestor">
+                                                <div className="flex items-center gap-2">
+                                                    <Badge className={roleBadgeColors.gestor}>Gestor</Badge>
+                                                    <span>Gerenciar projetos</span>
+                                                </div>
+                                            </SelectItem>
+                                            <SelectItem value="colaborador">
+                                                <div className="flex items-center gap-2">
+                                                    <Badge className={roleBadgeColors.colaborador}>Colaborador</Badge>
+                                                    <span>Acesso básico</span>
+                                                </div>
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <p className="text-xs text-muted-foreground">
+                                        {newRole === 'admin' && 'Administradores têm acesso a todos os departamentos e projetos automaticamente.'}
+                                        {newRole === 'gestor' && 'Gestores podem gerenciar apenas os departamentos e projetos selecionados.'}
+                                        {newRole === 'colaborador' && 'Colaboradores podem ver e atualizar atividades apenas dos departamentos/projetos selecionados.'}
+                                    </p>
+                                </div>
+                            </TabsContent>
+
+                            <TabsContent value="departments" className="space-y-4 mt-4">
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-sm font-medium">Departamentos com Acesso</label>
+                                        <span className="text-xs text-muted-foreground">
+                                            {selectedDepartments.length} de {companyDepartments?.length || 0} selecionados
+                                        </span>
+                                    </div>
+                                    <ScrollArea className="h-[200px] border rounded-lg p-3">
+                                        {!companyDepartments || companyDepartments.length === 0 ? (
+                                            <p className="text-sm text-muted-foreground text-center py-4">
+                                                Nenhum departamento cadastrado
+                                            </p>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {companyDepartments.map((dept) => (
+                                                    <div
+                                                        key={dept.id}
+                                                        className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
+                                                            selectedDepartments.includes(dept.id)
+                                                                ? 'bg-primary/10 border border-primary/20'
+                                                                : 'hover:bg-muted'
+                                                        }`}
+                                                        onClick={() => handleToggleDepartment(dept.id)}
+                                                    >
+                                                        <Checkbox
+                                                            checked={selectedDepartments.includes(dept.id)}
+                                                            onCheckedChange={() => handleToggleDepartment(dept.id)}
+                                                        />
+                                                        <div className="flex-1">
+                                                            <p className="text-sm font-medium">{dept.name}</p>
+                                                            {dept.description && (
+                                                                <p className="text-xs text-muted-foreground truncate">
+                                                                    {dept.description}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </ScrollArea>
+                                </div>
+                            </TabsContent>
+
+                            <TabsContent value="projects" className="space-y-4 mt-4">
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-sm font-medium">Projetos com Acesso</label>
+                                        <span className="text-xs text-muted-foreground">
+                                            {selectedProjects.length} de {companyProjects?.length || 0} selecionados
+                                        </span>
+                                    </div>
+                                    <ScrollArea className="h-[200px] border rounded-lg p-3">
+                                        {!companyProjects || companyProjects.length === 0 ? (
+                                            <p className="text-sm text-muted-foreground text-center py-4">
+                                                Nenhum projeto cadastrado
+                                            </p>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {companyProjects.map((proj) => (
+                                                    <div
+                                                        key={proj.id}
+                                                        className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
+                                                            selectedProjects.includes(proj.id)
+                                                                ? 'bg-primary/10 border border-primary/20'
+                                                                : 'hover:bg-muted'
+                                                        }`}
+                                                        onClick={() => handleToggleProject(proj.id)}
+                                                    >
+                                                        <Checkbox
+                                                            checked={selectedProjects.includes(proj.id)}
+                                                            onCheckedChange={() => handleToggleProject(proj.id)}
+                                                        />
+                                                        <div className="flex-1">
+                                                            <p className="text-sm font-medium">{proj.name}</p>
+                                                            {proj.description && (
+                                                                <p className="text-xs text-muted-foreground truncate">
+                                                                    {proj.description}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </ScrollArea>
+                                </div>
+                            </TabsContent>
+                        </Tabs>
                     </div>
 
                     <DialogFooter>
@@ -504,15 +802,18 @@ export function CompanyManagement() {
                         <Button
                             onClick={() => {
                                 if (editingMember) {
-                                    updateRoleMutation.mutate({
+                                    updateMemberAccessMutation.mutate({
                                         memberId: editingMember.id,
+                                        userId: editingMember.user_id,
                                         role: newRole,
+                                        departments: selectedDepartments,
+                                        projects: selectedProjects,
                                     });
                                 }
                             }}
-                            disabled={updateRoleMutation.isPending}
+                            disabled={updateMemberAccessMutation.isPending}
                         >
-                            {updateRoleMutation.isPending ? "Salvando..." : "Salvar"}
+                            {updateMemberAccessMutation.isPending ? "Salvando..." : "Salvar Alterações"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -537,7 +838,7 @@ export function CompanyManagement() {
                             }}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                            Remover
+                            {removeMemberMutation.isPending ? "Removendo..." : "Remover"}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
