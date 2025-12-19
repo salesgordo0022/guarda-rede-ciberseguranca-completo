@@ -135,11 +135,12 @@ export function DailyReportDialog() {
 
             return Array.from(userMap.values())
                 .sort((a, b) => {
-                    // Ordenar por ciclos completados primeiro, depois por score
-                    if (b.total_cycles_completed !== a.total_cycles_completed) {
-                        return b.total_cycles_completed - a.total_cycles_completed;
+                    // Ordenar por score primeiro (maior score = ranking mais alto)
+                    if (b.current_score !== a.current_score) {
+                        return b.current_score - a.current_score;
                     }
-                    return b.current_score - a.current_score;
+                    // Em caso de empate no score, ordenar por ciclos completados
+                    return b.total_cycles_completed - a.total_cycles_completed;
                 });
         },
         enabled: !!selectedCompanyId
