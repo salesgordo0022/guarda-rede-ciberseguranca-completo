@@ -126,10 +126,11 @@ Deno.serve(async (req) => {
 
       // Add new company assignments
       if (companyIds.length > 0) {
-        const companyInserts = companyIds.map((cId: string, index: number) => ({
+        const companyInserts = companyIds.map((cId: string) => ({
           user_id: userId,
           company_id: cId,
-          role: index === 0 ? role : "colaborador", // First company gets the selected role
+          // Apply the selected role to the current company, colaborador to others
+          role: cId === companyId ? role : "colaborador",
         }));
 
         const { error: companyError } = await supabaseAdmin
