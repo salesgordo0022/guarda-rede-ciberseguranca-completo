@@ -589,6 +589,19 @@ const ProjectDetail = () => {
         )}
       </Tabs>
 
+      {/* Floating bottom button for creating activity */}
+      {(isAdmin || isGestor) && (
+        <div className="flex justify-center pt-4 pb-8">
+          <Button 
+            onClick={() => setIsCreating(true)} 
+            size="lg"
+            className="bg-primary hover:bg-primary/90 shadow-lg"
+          >
+            <Plus className="h-5 w-5 mr-2" />
+            Nova Atividade
+          </Button>
+        </div>
+      )}
       <ActivityDetailsSheet
         activity={viewingActivity}
         open={!!viewingActivity}
