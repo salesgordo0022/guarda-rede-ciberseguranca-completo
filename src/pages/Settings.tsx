@@ -1,4 +1,4 @@
-import { Settings as SettingsIcon, Plus, Pencil, Trash2, Building2, Palette, Check, History, Users, User } from "lucide-react";
+import { Settings as SettingsIcon, Plus, Pencil, Trash2, Building2, Palette, Check, History, Users, User, Briefcase } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -56,6 +56,7 @@ import { useTasks } from "@/hooks/useTasks";
 import { TaskHistoryTable } from "@/components/TaskHistoryTable";
 import { TeamTabContent } from "@/components/TeamTabContent";
 import { ProfileSettings } from "@/components/ProfileSettings";
+import { CompanyManagement } from "@/components/CompanyManagement";
 import { useAuth } from "@/hooks/useAuth";
 
 interface Department {
@@ -312,11 +313,17 @@ const Settings = () => {
             </div>
 
             <Tabs defaultValue="profile" className="w-full">
-                <TabsList className={`grid w-full max-w-3xl ${canManageTeam ? 'grid-cols-3 md:grid-cols-5' : 'grid-cols-3'} h-auto`}>
+                <TabsList className={`grid w-full max-w-4xl ${canManageTeam ? 'grid-cols-3 md:grid-cols-6' : 'grid-cols-3'} h-auto`}>
                     <TabsTrigger value="profile" className="flex-col md:flex-row gap-1 py-2 text-xs md:text-sm">
                         <User className="h-4 w-4" />
                         <span className="hidden sm:inline">Perfil</span>
                     </TabsTrigger>
+                    {canManageTeam && (
+                        <TabsTrigger value="companies" className="flex-col md:flex-row gap-1 py-2 text-xs md:text-sm">
+                            <Briefcase className="h-4 w-4" />
+                            <span className="hidden sm:inline">Empresas</span>
+                        </TabsTrigger>
+                    )}
                     {canManageTeam && (
                         <TabsTrigger value="departments" className="flex-col md:flex-row gap-1 py-2 text-xs md:text-sm">
                             <Building2 className="h-4 w-4" />
@@ -343,6 +350,13 @@ const Settings = () => {
                 <TabsContent value="profile" className="space-y-4">
                     <ProfileSettings />
                 </TabsContent>
+
+                {/* Tab de Empresas */}
+                {canManageTeam && (
+                <TabsContent value="companies" className="space-y-4">
+                    <CompanyManagement />
+                </TabsContent>
+                )}
 
                 {/* Tab de Departamentos */}
                 {canManageTeam && (
