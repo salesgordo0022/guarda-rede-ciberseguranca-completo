@@ -110,6 +110,7 @@ const createUserSchema = z.object({
 // Schema de validação para edição de usuário
 const editUserSchema = z.object({
     fullName: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
+    email: z.string().email("Email inválido"),
     role: z.enum(["admin", "gestor", "colaborador"], {
         required_error: "Selecione um tipo de usuário",
     }),
@@ -178,6 +179,7 @@ export const TeamTabContent = () => {
         resolver: zodResolver(editUserSchema),
         defaultValues: {
             fullName: "",
+            email: "",
             role: "colaborador",
             password: "",
         },
@@ -188,6 +190,7 @@ export const TeamTabContent = () => {
         if (editingMember) {
             editForm.reset({
                 fullName: editingMember.full_name,
+                email: editingMember.email,
                 role: editingMember.role,
                 password: "",
             });
@@ -386,6 +389,7 @@ export const TeamTabContent = () => {
                     companyId: selectedCompanyId,
                     role: values.role,
                     fullName: values.fullName,
+                    email: values.email,
                     password: values.password || undefined,
                     departmentIds: editDepartments,
                     companyIds: editCompanies,
@@ -861,6 +865,27 @@ export const TeamTabContent = () => {
                                         <FormLabel>Nome Completo</FormLabel>
                                         <FormControl>
                                             <Input placeholder="João Silva" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={editForm.control}
+                                name="email"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="flex items-center gap-2">
+                                            <Mail className="h-4 w-4" />
+                                            E-mail
+                                        </FormLabel>
+                                        <FormControl>
+                                            <Input 
+                                                type="email" 
+                                                placeholder="email@exemplo.com" 
+                                                {...field} 
+                                            />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>

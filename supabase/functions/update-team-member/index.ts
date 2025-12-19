@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { userId, companyId, role, departmentIds, password, fullName, companyIds } = await req.json();
+    const { userId, companyId, role, departmentIds, password, fullName, email, companyIds } = await req.json();
 
     // Verify the calling user is an admin of the company
     const { data: userCompany } = await supabaseAdmin
@@ -70,6 +70,33 @@ Deno.serve(async (req) => {
         );
       }
       console.log("Password updated for user:", userId);
+    }
+
+    // Update email if provided
+    if (email) {
+      // Update in auth
+      const { error: emailError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+        email: email,
+      });
+
+      if (emailError) {
+        console.error("Email update error:", emailError);
+        return new Response(
+          JSON.stringify({ error: "Erro ao atualizar email: " + emailError.message }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Update in profiles table
+      const { error: profileEmailError } = await supabaseAdmin
+        .from("profiles")
+        .update({ email: email })
+        .eq("id", userId);
+
+      if (profileEmailError) {
+        console.error("Profile email update error:", profileEmailError);
+      }
+      console.log("Email updated for user:", userId);
     }
 
     // Update full name if provided
