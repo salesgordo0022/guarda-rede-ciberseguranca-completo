@@ -1330,6 +1330,24 @@ export function ActivityDetailsSheet({
                             </div>
                         </>
 
+                        {/* Bottom Create Button - only in create mode */}
+                        {mode === 'create' && (
+                            <>
+                                <Separator />
+                                <div className="flex justify-center pt-4 pb-2">
+                                    <Button 
+                                        onClick={handleSave} 
+                                        disabled={loading}
+                                        size="lg"
+                                        className="bg-primary hover:bg-primary/90 shadow-lg"
+                                    >
+                                        <Save className="h-5 w-5 mr-2" />
+                                        {loading ? "Criando..." : "Criar Atividade"}
+                                    </Button>
+                                </div>
+                            </>
+                        )}
+
                     </div>
                 </ScrollArea>
             </SheetContent>
