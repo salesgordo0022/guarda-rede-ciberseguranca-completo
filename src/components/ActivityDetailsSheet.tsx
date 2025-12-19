@@ -1340,22 +1340,27 @@ export function ActivityDetailsSheet({
                                 size="lg"
                                 className="bg-primary hover:bg-primary/90 shadow-lg min-w-[180px]"
                             >
-                                {loading ? (
-                                    <>
-                                        <img src={loadingPikachu} alt="Carregando" className="h-6 w-6 mr-2" />
-                                        {mode === 'create' ? "Criando..." : "Salvando..."}
-                                    </>
-                                ) : (
-                                    <>
-                                        <Save className="h-5 w-5 mr-2" />
-                                        {mode === 'create' ? "Criar Atividade" : "Salvar Alterações"}
-                                    </>
-                                )}
+                                <Save className="h-5 w-5 mr-2" />
+                                {mode === 'create' ? "Criar Atividade" : "Salvar Alterações"}
                             </Button>
                         </div>
 
                     </div>
                 </ScrollArea>
+
+                {/* Loading Overlay */}
+                {loading && (
+                    <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center z-50">
+                        <img 
+                            src={loadingPikachu} 
+                            alt="Carregando" 
+                            className="h-32 w-32 object-contain"
+                        />
+                        <p className="mt-4 text-lg font-medium text-foreground">
+                            {mode === 'create' ? "Criando atividade..." : "Salvando alterações..."}
+                        </p>
+                    </div>
+                )}
             </SheetContent>
         </Sheet>
     );
