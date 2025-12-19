@@ -29,6 +29,7 @@ import { LoginBar } from "@/components/LoginBar";
 import { NotificationBell } from "@/components/NotificationBell";
 import { Tutorial } from "@/components/Tutorial";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 
 // Import deadline monitoring
 import { startDeadlineMonitoring } from "@/utils/deadlineMonitor";
@@ -96,7 +97,7 @@ const ThemeApplicator = () => {
 // Verifica se o usuário está autenticado antes de permitir acesso à rota
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   // Hook para acessar o estado de autenticação do usuário
-  const { session, loading, companyLoading, selectedCompanyId } = useAuth();
+  const { session, loading, companyLoading, selectedCompanyId, profile, signOut, refetchProfile } = useAuth();
 
   // Mostrar tela de carregamento enquanto verifica autenticação
   if (loading) {
@@ -116,8 +117,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     return <Navigate to="/auth" replace />;
   }
 
-  // Mostrar carregamento enquanto busca empresa
-  if (companyLoading || (!selectedCompanyId && session)) {
+  // Enquanto busca empresa
+  if (companyLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
         <div className="relative">
@@ -127,9 +128,41 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
         <div className="flex flex-col items-center gap-2">
           <p className="text-muted-foreground">Carregando empresa...</p>
           <div className="flex gap-1">
-            <span className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
-            <span className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
-            <span className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
+            <span className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "0ms" }} />
+            <span className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "150ms" }} />
+            <span className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "300ms" }} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Se a empresa não foi resolvida, evita loop infinito e mostra ação ao usuário.
+  if (!selectedCompanyId) {
+    const isConnectionIssue = !profile; // quando falha ao buscar perfil/empresas (ex.: CORS / rede)
+
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background px-4">
+        <div className="max-w-md w-full">
+          <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
+            <h1 className="text-lg font-semibold text-foreground">Não foi possível carregar sua empresa</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {isConnectionIssue
+                ? "Parece haver um problema de conexão com o backend (CORS/rede)."
+                : "Seu usuário ainda não tem uma empresa vinculada."}
+            </p>
+
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Button onClick={() => refetchProfile()}>
+                Tentar novamente
+              </Button>
+              <Button variant="outline" onClick={() => window.location.reload()}>
+                Recarregar
+              </Button>
+              <Button variant="destructive" onClick={() => signOut()}>
+                Sair
+              </Button>
+            </div>
           </div>
         </div>
       </div>
