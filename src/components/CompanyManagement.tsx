@@ -736,7 +736,9 @@ export function CompanyManagement() {
                                                     >
                                                         <Checkbox
                                                             checked={selectedDepartments.includes(dept.id)}
+                                                            onClick={(e) => e.stopPropagation()}
                                                             onCheckedChange={() => handleToggleDepartment(dept.id)}
+                                                            aria-label={`Acesso ao departamento ${dept.name}`}
                                                         />
                                                         <div className="flex-1">
                                                             <p className="text-sm font-medium">{dept.name}</p>
@@ -781,7 +783,9 @@ export function CompanyManagement() {
                                                     >
                                                         <Checkbox
                                                             checked={selectedProjects.includes(proj.id)}
+                                                            onClick={(e) => e.stopPropagation()}
                                                             onCheckedChange={() => handleToggleProject(proj.id)}
+                                                            aria-label={`Acesso ao projeto ${proj.name}`}
                                                         />
                                                         <div className="flex-1">
                                                             <p className="text-sm font-medium">{proj.name}</p>
