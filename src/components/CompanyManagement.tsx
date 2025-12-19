@@ -204,6 +204,9 @@ export function CompanyManagement() {
             return data as Department[];
         },
         enabled: !!selectedCompany?.id,
+        refetchOnWindowFocus: true,
+        refetchInterval: 3000, // Atualiza a cada 3 segundos
+        staleTime: 1000,
     });
 
     // Buscar projetos da empresa selecionada
@@ -222,6 +225,9 @@ export function CompanyManagement() {
             return data as Project[];
         },
         enabled: !!selectedCompany?.id,
+        refetchOnWindowFocus: true,
+        refetchInterval: 3000, // Atualiza a cada 3 segundos
+        staleTime: 1000,
     });
 
     // Buscar departamentos do membro sendo editado
