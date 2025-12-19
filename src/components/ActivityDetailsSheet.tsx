@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import loadingPikachu from "@/assets/loading-pikachu.gif";
 import {
     Sheet,
     SheetContent,
@@ -1337,13 +1338,19 @@ export function ActivityDetailsSheet({
                                 onClick={handleSave} 
                                 disabled={loading}
                                 size="lg"
-                                className="bg-primary hover:bg-primary/90 shadow-lg"
+                                className="bg-primary hover:bg-primary/90 shadow-lg min-w-[180px]"
                             >
-                                <Save className="h-5 w-5 mr-2" />
-                                {loading 
-                                    ? (mode === 'create' ? "Criando..." : "Salvando...") 
-                                    : (mode === 'create' ? "Criar Atividade" : "Salvar Alterações")
-                                }
+                                {loading ? (
+                                    <>
+                                        <img src={loadingPikachu} alt="Carregando" className="h-6 w-6 mr-2" />
+                                        {mode === 'create' ? "Criando..." : "Salvando..."}
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save className="h-5 w-5 mr-2" />
+                                        {mode === 'create' ? "Criar Atividade" : "Salvar Alterações"}
+                                    </>
+                                )}
                             </Button>
                         </div>
 
