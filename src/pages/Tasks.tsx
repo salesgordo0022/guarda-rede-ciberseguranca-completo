@@ -98,6 +98,11 @@ const Tasks = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!user?.id) {
+      toast.error("Usuário não autenticado. Faça login novamente.");
+      return;
+    }
+
     if (!projectId) {
       toast.error("Selecione um projeto");
       return;
@@ -109,7 +114,7 @@ const Tasks = () => {
       status: status as ActivityStatus,
       deadline: deadline || null,
       project_id: projectId,
-      created_by: user?.id || "",
+      created_by: user.id,
     };
 
     if (editing) {

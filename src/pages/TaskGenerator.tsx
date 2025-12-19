@@ -65,6 +65,15 @@ const TaskGenerator = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!user?.id) {
+      toast({
+        title: "Erro",
+        description: "Usuário não autenticado. Faça login novamente.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!name) {
       toast({ title: "Erro", description: "Informe o nome", variant: "destructive" });
       return;
@@ -81,7 +90,7 @@ const TaskGenerator = () => {
         description: description || null,
         project_id: projectId,
         deadline: deadline ? format(deadline, "yyyy-MM-dd") : null,
-        created_by: user?.id || "",
+        created_by: user.id,
         status: "pendente",
       });
 
@@ -102,7 +111,7 @@ const TaskGenerator = () => {
         description: description || null,
         department_id: departmentId,
         deadline: deadline ? format(deadline, "yyyy-MM-dd") : null,
-        created_by: user?.id || "",
+        created_by: user.id,
         status: "pendente",
       });
 
