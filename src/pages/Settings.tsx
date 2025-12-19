@@ -173,6 +173,7 @@ const Settings = () => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["departments"] });
+            queryClient.invalidateQueries({ queryKey: ["company-departments"] });
             queryClient.invalidateQueries({ queryKey: ["activities"] });
             toast({
                 title: "Departamento criado!",
