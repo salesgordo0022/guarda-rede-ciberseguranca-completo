@@ -11,6 +11,7 @@ import { Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
+import { useLoading } from "@/contexts/LoadingContext";
 
 interface Department {
   id: string;
@@ -27,6 +28,7 @@ const Departments = () => {
   const [description, setDescription] = useState("");
   const { profile, isAdmin, selectedCompanyId } = useAuth();
   const navigate = useNavigate();
+  const { showLoading, hideLoading } = useLoading();
 
   useEffect(() => {
     if (!isAdmin) {
@@ -62,39 +64,45 @@ const Departments = () => {
       return;
     }
 
-    if (editing) {
-      const { error } = await supabase
-        .from("departments")
-        .update({ name, description })
-        .eq("id", editing.id);
+    showLoading(editing ? "Atualizando departamento..." : "Criando departamento...");
 
-      if (error) {
-        toast.error("Erro ao atualizar departamento");
-        return;
+    try {
+      if (editing) {
+        const { error } = await supabase
+          .from("departments")
+          .update({ name, description })
+          .eq("id", editing.id);
+
+        if (error) {
+          toast.error("Erro ao atualizar departamento");
+          return;
+        }
+
+        toast.success("Departamento atualizado!");
+      } else {
+        const { error } = await supabase
+          .from("departments")
+          .insert({
+            name,
+            description,
+            company_id: selectedCompanyId,
+            created_by: profile.id,
+          });
+
+        if (error) {
+          toast.error("Erro ao criar departamento");
+          return;
+        }
+
+        toast.success("Departamento criado!");
       }
 
-      toast.success("Departamento atualizado!");
-    } else {
-      const { error } = await supabase
-        .from("departments")
-        .insert({
-          name,
-          description,
-          company_id: selectedCompanyId,
-          created_by: profile.id,
-        });
-
-      if (error) {
-        toast.error("Erro ao criar departamento");
-        return;
-      }
-
-      toast.success("Departamento criado!");
+      setOpen(false);
+      resetForm();
+      fetchDepartments();
+    } finally {
+      hideLoading();
     }
-
-    setOpen(false);
-    resetForm();
-    fetchDepartments();
   };
 
   const handleEdit = (dept: Department) => {
@@ -107,15 +115,21 @@ const Departments = () => {
   const handleDelete = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir este departamento?")) return;
 
-    const { error } = await supabase.from("departments").delete().eq("id", id);
+    showLoading("Excluindo departamento...");
 
-    if (error) {
-      toast.error("Erro ao excluir departamento");
-      return;
+    try {
+      const { error } = await supabase.from("departments").delete().eq("id", id);
+
+      if (error) {
+        toast.error("Erro ao excluir departamento");
+        return;
+      }
+
+      toast.success("Departamento excluído!");
+      fetchDepartments();
+    } finally {
+      hideLoading();
     }
-
-    toast.success("Departamento excluído!");
-    fetchDepartments();
   };
 
   const resetForm = () => {
