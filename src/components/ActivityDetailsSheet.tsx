@@ -65,8 +65,12 @@ import {
     notifyActivityStatusChanged,
     notifyProjectActivityCreated,
     notifyProjectActivityCompleted,
-    notifyCommentAdded
+    notifyCommentAdded,
+    extractMentions,
+    notifyMentionedUsers,
+    formatMentionsForDisplay
 } from "@/utils/notificationService";
+import { MentionInput } from "@/components/MentionInput";
 
 interface ChecklistItem {
     id: string;
@@ -653,10 +657,11 @@ export function ActivityDetailsSheet({
         if (!error && data) {
             setComments([data, ...comments]);
             
-            // Notificar todos da empresa sobre o comentário
-            if (profile?.id && selectedCompanyId) {
-                await notifyCommentAdded(
-                    selectedCompanyId,
+            // Extrair menções e notificar usuários mencionados
+            const mentionedUserIds = extractMentions(newComment);
+            if (mentionedUserIds.length > 0 && profile?.id) {
+                await notifyMentionedUsers(
+                    mentionedUserIds,
                     initialActivity.name,
                     initialActivity.id,
                     initialActivity.department_id,
@@ -1236,14 +1241,15 @@ export function ActivityDetailsSheet({
                                     </p>
                                 ) : (
                                     <>
-                                        <div className="flex gap-2">
-                                            <Input
+                                        <div className="flex gap-2 items-start">
+                                            <MentionInput
                                                 value={newComment}
-                                                onChange={(e) => setNewComment(e.target.value)}
-                                                placeholder="Adicionar comentário..."
-                                                onKeyDown={(e) => e.key === 'Enter' && addComment()}
+                                                onChange={setNewComment}
+                                                onSubmit={addComment}
+                                                placeholder="Adicionar comentário... (@ para mencionar)"
+                                                teamMembers={teamMembers}
                                             />
-                                            <Button onClick={addComment} size="icon" variant="outline">
+                                            <Button onClick={addComment} size="icon" variant="outline" className="shrink-0">
                                                 <Send className="h-4 w-4" />
                                             </Button>
                                         </div>
@@ -1266,7 +1272,15 @@ export function ActivityDetailsSheet({
                                                                 {format(new Date(comment.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
                                                             </span>
                                                         </div>
-                                                        <p className="text-sm pl-8">{comment.content}</p>
+                                                        <p className="text-sm pl-8">
+                                                            {formatMentionsForDisplay(comment.content).split(/(@\w+(?:\s\w+)?)/g).map((part, i) => 
+                                                                part.startsWith('@') ? (
+                                                                    <span key={i} className="text-primary font-medium bg-primary/10 px-1 rounded">
+                                                                        {part}
+                                                                    </span>
+                                                                ) : part
+                                                            )}
+                                                        </p>
                                                     </div>
                                                 ))
                                             )}

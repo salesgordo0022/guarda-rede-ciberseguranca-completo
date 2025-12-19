@@ -261,3 +261,70 @@ export async function notifyCommentAdded(
     createdBy,
   });
 }
+
+// ========== Mention Notifications ==========
+
+/**
+ * Extracts mentioned user IDs from a comment text
+ * Mentions are in the format @[userId:userName]
+ */
+export function extractMentions(text: string): string[] {
+  const mentionRegex = /@\[([a-f0-9-]+):[^\]]+\]/g;
+  const matches = text.matchAll(mentionRegex);
+  const userIds: string[] = [];
+  
+  for (const match of matches) {
+    if (match[1] && !userIds.includes(match[1])) {
+      userIds.push(match[1]);
+    }
+  }
+  
+  return userIds;
+}
+
+/**
+ * Formats comment text for display, converting mentions to readable names
+ */
+export function formatMentionsForDisplay(text: string): string {
+  return text.replace(/@\[([a-f0-9-]+):([^\]]+)\]/g, '@$2');
+}
+
+/**
+ * Creates notifications for mentioned users
+ */
+export async function notifyMentionedUsers(
+  mentionedUserIds: string[],
+  activityName: string,
+  activityId: string,
+  departmentId: string | undefined,
+  projectId: string | undefined,
+  mentionerName: string,
+  createdBy: string
+) {
+  if (mentionedUserIds.length === 0) return;
+
+  try {
+    const notifications = mentionedUserIds
+      .filter(userId => userId !== createdBy) // Don't notify the person who mentioned
+      .map(userId => ({
+        user_id: userId,
+        title: "Você foi mencionado",
+        description: `${mentionerName} mencionou você em um comentário na atividade "${activityName}"`,
+        type: "mention" as NotificationType,
+        activity_id: activityId,
+        project_id: projectId || null,
+        department_id: departmentId || null,
+        created_by: createdBy,
+      }));
+
+    if (notifications.length > 0) {
+      const { error } = await supabase.from("notifications").insert(notifications);
+      
+      if (error) {
+        console.error("Error creating mention notifications:", error);
+      }
+    }
+  } catch (e) {
+    console.error("Error in notifyMentionedUsers:", e);
+  }
+}
