@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useLoading } from "@/contexts/LoadingContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -92,6 +93,7 @@ const roleBadgeColors: Record<AppRole, string> = {
 export function CompanyManagement() {
     const { user, selectedCompanyId, isAdmin } = useAuth();
     const queryClient = useQueryClient();
+    const { showLoading, hideLoading } = useLoading();
     const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
     const [editingMember, setEditingMember] = useState<CompanyMember | null>(null);
     const [newRole, setNewRole] = useState<AppRole>("colaborador");
@@ -170,6 +172,7 @@ export function CompanyManagement() {
     // Mutation para atualizar role
     const updateRoleMutation = useMutation({
         mutationFn: async ({ memberId, role }: { memberId: string; role: AppRole }) => {
+            showLoading("Atualizando nível de acesso...");
             const { error } = await supabase
                 .from("user_companies")
                 .update({ role })
@@ -178,11 +181,13 @@ export function CompanyManagement() {
             if (error) throw error;
         },
         onSuccess: () => {
+            hideLoading();
             queryClient.invalidateQueries({ queryKey: ["company-members", selectedCompany?.id] });
             toast.success("Nível de acesso atualizado com sucesso!");
             setEditingMember(null);
         },
         onError: (error: any) => {
+            hideLoading();
             toast.error("Erro ao atualizar nível de acesso: " + error.message);
         },
     });
@@ -190,6 +195,7 @@ export function CompanyManagement() {
     // Mutation para remover membro
     const removeMemberMutation = useMutation({
         mutationFn: async (memberId: string) => {
+            showLoading("Removendo membro...");
             const { error } = await supabase
                 .from("user_companies")
                 .delete()
@@ -198,11 +204,13 @@ export function CompanyManagement() {
             if (error) throw error;
         },
         onSuccess: () => {
+            hideLoading();
             queryClient.invalidateQueries({ queryKey: ["company-members", selectedCompany?.id] });
             toast.success("Membro removido da empresa!");
             setRemovingMember(null);
         },
         onError: (error: any) => {
+            hideLoading();
             toast.error("Erro ao remover membro: " + error.message);
         },
     });

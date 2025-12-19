@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -14,6 +13,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Users } from "lucide-react";
 import { notifyProjectCreated } from "@/utils/notificationService";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useLoading } from "@/contexts/LoadingContext";
 
 interface CreateProjectDialogProps {
     open?: boolean;
@@ -49,6 +49,7 @@ export function CreateProjectDialog({ open: controlledOpen, onOpenChange: setCon
     const [description, setDescription] = useState("");
     const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
     const [loading, setLoading] = useState(false);
+    const { showLoading, hideLoading } = useLoading();
 
     // Fetch team members from the company
     const {
@@ -126,6 +127,7 @@ export function CreateProjectDialog({ open: controlledOpen, onOpenChange: setCon
         }
 
         setLoading(true);
+        showLoading("Criando projeto...");
         try {
             // Create the project
             const { data, error } = await supabase
@@ -182,6 +184,7 @@ export function CreateProjectDialog({ open: controlledOpen, onOpenChange: setCon
             toast.error(`Erro ao criar projeto: ${error.message}`);
         } finally {
             setLoading(false);
+            hideLoading();
         }
     };
 

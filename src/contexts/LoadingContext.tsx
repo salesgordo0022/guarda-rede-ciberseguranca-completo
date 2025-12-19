@@ -1,0 +1,53 @@
+import React, { createContext, useContext, useState, ReactNode } from 'react';
+import loadingPikachu from '@/assets/loading-pikachu.gif';
+
+interface LoadingContextType {
+  isLoading: boolean;
+  loadingMessage: string;
+  showLoading: (message?: string) => void;
+  hideLoading: () => void;
+}
+
+const LoadingContext = createContext<LoadingContextType | undefined>(undefined);
+
+export function LoadingProvider({ children }: { children: ReactNode }) {
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('Carregando...');
+
+  const showLoading = (message: string = 'Carregando...') => {
+    setLoadingMessage(message);
+    setIsLoading(true);
+  };
+
+  const hideLoading = () => {
+    setIsLoading(false);
+  };
+
+  return (
+    <LoadingContext.Provider value={{ isLoading, loadingMessage, showLoading, hideLoading }}>
+      {children}
+      {isLoading && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-4">
+            <img 
+              src={loadingPikachu} 
+              alt="Carregando" 
+              className="w-32 h-32 object-contain"
+            />
+            <p className="text-lg font-medium text-foreground animate-pulse">
+              {loadingMessage}
+            </p>
+          </div>
+        </div>
+      )}
+    </LoadingContext.Provider>
+  );
+}
+
+export function useLoading() {
+  const context = useContext(LoadingContext);
+  if (context === undefined) {
+    throw new Error('useLoading must be used within a LoadingProvider');
+  }
+  return context;
+}

@@ -11,6 +11,7 @@ import { useEffect } from "react";
 // Importações de hooks personalizados
 import { useSystemSettings, SystemSettingsProvider } from "@/hooks/useSystemSettings";
 import { useAuth, AuthProvider } from "@/hooks/useAuth";
+import { LoadingProvider } from "@/contexts/LoadingContext";
 
 // Importações de páginas da aplicação
 import Index from "./pages/Index";
@@ -184,56 +185,58 @@ const App = () => {
     <QueryClientProvider client={queryClient}>
       <SystemSettingsProvider>
         <AuthProvider>
-          <TooltipProvider>
-            <ErrorBoundary>
-              <Toaster />
-              <Sonner />
-              <ThemeApplicator />
-              <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
-                <LoginBar />
-                <Routes>
-                  <Route path="/auth" element={<Auth />} />
-                  <Route
-                    path="/*"
-                    element={
-                      <ProtectedRoute>
-                        <div className="relative min-h-screen flex w-full">
-                          <SidebarProvider>
-                            <div className="flex w-full">
-                              <AppSidebar />
-                              <main className="flex-1 overflow-auto">
-                                <div className="border-b border-border bg-background sticky top-0 z-10">
-                                  <div className="flex items-center justify-between h-14 px-4">
-                                    <SidebarTrigger />
-                                    <div className="flex items-center gap-4">
-                                      <NotificationBell />
-                                      <UserProfile />
+          <LoadingProvider>
+            <TooltipProvider>
+              <ErrorBoundary>
+                <Toaster />
+                <Sonner />
+                <ThemeApplicator />
+                <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+                  <LoginBar />
+                  <Routes>
+                    <Route path="/auth" element={<Auth />} />
+                    <Route
+                      path="/*"
+                      element={
+                        <ProtectedRoute>
+                          <div className="relative min-h-screen flex w-full">
+                            <SidebarProvider>
+                              <div className="flex w-full">
+                                <AppSidebar />
+                                <main className="flex-1 overflow-auto">
+                                  <div className="border-b border-border bg-background sticky top-0 z-10">
+                                    <div className="flex items-center justify-between h-14 px-4">
+                                      <SidebarTrigger />
+                                      <div className="flex items-center gap-4">
+                                        <NotificationBell />
+                                        <UserProfile />
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                                <Routes>
-                                  <Route path="/" element={<Index data-tutorial="dashboard" />} />
-                                  <Route path="/departments" element={<Departments data-tutorial="departments" />} />
-                                  <Route path="/activities" element={<Activities data-tutorial="activities" />} />
-                                  <Route path="/projects" element={<Projects />} />
-                                  <Route path="/projects/:projectId" element={<ProjectDetail />} />
-                                  <Route path="/settings" element={<Settings data-tutorial="settings" />} />
-                                  <Route path="*" element={<NotFound />} />
-                                </Routes>
-                              </main>
-                            </div>
-                            <div className="fixed bottom-4 right-4 z-50">
-                              <Tutorial />
-                            </div>
-                          </SidebarProvider>
-                        </div>
-                      </ProtectedRoute>
-                    }
-                  />
-                </Routes>
-              </BrowserRouter>
-            </ErrorBoundary>
-          </TooltipProvider>
+                                  <Routes>
+                                    <Route path="/" element={<Index data-tutorial="dashboard" />} />
+                                    <Route path="/departments" element={<Departments data-tutorial="departments" />} />
+                                    <Route path="/activities" element={<Activities data-tutorial="activities" />} />
+                                    <Route path="/projects" element={<Projects />} />
+                                    <Route path="/projects/:projectId" element={<ProjectDetail />} />
+                                    <Route path="/settings" element={<Settings data-tutorial="settings" />} />
+                                    <Route path="*" element={<NotFound />} />
+                                  </Routes>
+                                </main>
+                              </div>
+                              <div className="fixed bottom-4 right-4 z-50">
+                                <Tutorial />
+                              </div>
+                            </SidebarProvider>
+                          </div>
+                        </ProtectedRoute>
+                      }
+                    />
+                  </Routes>
+                </BrowserRouter>
+              </ErrorBoundary>
+            </TooltipProvider>
+          </LoadingProvider>
         </AuthProvider>
       </SystemSettingsProvider>
     </QueryClientProvider>
