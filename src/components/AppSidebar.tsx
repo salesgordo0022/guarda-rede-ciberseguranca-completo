@@ -45,7 +45,7 @@ export function AppSidebar() {
   const { open } = useSidebar();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
-  const { profile, signOut, selectedCompanyId, setSelectedCompanyId, isAdmin, refetchProfile } = useAuth();
+  const { profile, signOut, selectedCompanyId, setSelectedCompanyId, isAdmin } = useAuth();
   const [newCompanyName, setNewCompanyName] = useState("");
   const [isCreatingCompany, setIsCreatingCompany] = useState(false);
 
@@ -173,9 +173,7 @@ export function AppSidebar() {
               <Select 
                 value={selectedCompanyId || ""} 
                 onValueChange={(value) => {
-                  setSelectedCompanyId(value);
-                  // Refetch para atualizar a role da empresa selecionada
-                  setTimeout(() => refetchProfile(), 100);
+                  void setSelectedCompanyId(value);
                 }}
               >
                 <SelectTrigger className="w-full bg-sidebar-accent border-sidebar-border text-sidebar-foreground">
