@@ -45,13 +45,13 @@ export function ActionButtons({ onCreateTask, date, onDateChange }: ActionButton
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
-          <DropdownMenuItem onClick={() => setIsCreateProjectOpen(true)} className="cursor-pointer">
-            <FolderPlus className="h-4 w-4 mr-2 text-emerald-600" />
-            <span>Novo Projeto</span>
-          </DropdownMenuItem>
           <DropdownMenuItem onClick={() => setIsCreateActivityOpen(true)} className="cursor-pointer">
             <FilePlus className="h-4 w-4 mr-2 text-blue-600" />
             <span>Nova Atividade</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setIsCreateProjectOpen(true)} className="cursor-pointer">
+            <FolderPlus className="h-4 w-4 mr-2 text-emerald-600" />
+            <span>Novo Projeto</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
