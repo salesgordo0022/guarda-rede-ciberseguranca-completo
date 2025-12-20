@@ -71,11 +71,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
   const fetchProfile = async (userId: string, overrideCompanyId?: string | null): Promise<{ profile: UserProfile | null; companyId: string | null }> => {
     try {
-      // Buscar perfil, empresas e departamento em paralelo para melhor performance
-      const [profileResult, companiesResult, departmentResult] = await Promise.all([
+      // Buscar perfil, empresas, departamento e role global em paralelo
+      const [profileResult, companiesResult, departmentResult, globalRoleResult] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
         supabase.from('user_companies').select('company_id, role').eq('user_id', userId).order('created_at', { ascending: true }),
-        supabase.from('user_departments').select('department_id').eq('user_id', userId).maybeSingle()
+        supabase.from('user_departments').select('department_id').eq('user_id', userId).maybeSingle(),
+        supabase.from('user_roles').select('role').eq('user_id', userId).maybeSingle()
       ]);
 
       if (profileResult.error) {
@@ -106,27 +107,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Usa a empresa override apenas se for válida; senão usa a primeira empresa
       const targetCompanyId = overrideIsValid ? overrideCompanyId! : firstCompanyId;
 
-      // Role vem prioritariamente da associação por empresa (user_companies)
+      // NOVA LÓGICA: Role global (user_roles) tem prioridade para ADMIN
+      // Se o usuário é admin global, ele é admin em QUALQUER contexto
+      const globalRole = globalRoleResult.data?.role as 'admin' | 'gestor' | 'colaborador' | null;
+      
       let userRole: 'admin' | 'gestor' | 'colaborador' = 'colaborador';
-      const hasCompanyContext = !!(targetCompanyId && companiesData && companiesData.length > 0);
-
-      if (hasCompanyContext) {
-        const companyRecord = companiesData!.find(c => c.company_id === targetCompanyId);
+      
+      // Se é admin global, sempre é admin (acesso total)
+      if (globalRole === 'admin') {
+        userRole = 'admin';
+      } 
+      // Se é gestor global, pode acessar tudo (mas sem config admin)
+      else if (globalRole === 'gestor') {
+        userRole = 'gestor';
+      }
+      // Senão, usa a role da empresa específica ou colaborador por padrão
+      else if (targetCompanyId && companiesData && companiesData.length > 0) {
+        const companyRecord = companiesData.find(c => c.company_id === targetCompanyId);
         if (companyRecord?.role) {
           userRole = companyRecord.role as 'admin' | 'gestor' | 'colaborador';
-        }
-      }
-
-      // Fallback: se o usuário ainda não tiver empresas vinculadas, usa user_roles (papel global)
-      if (!hasCompanyContext) {
-        const { data: roleData } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', userId)
-          .maybeSingle();
-
-        if (roleData?.role) {
-          userRole = roleData.role as 'admin' | 'gestor' | 'colaborador';
         }
       }
 
