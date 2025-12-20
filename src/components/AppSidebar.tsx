@@ -55,16 +55,26 @@ export function AppSidebar() {
     queryFn: async () => {
       if (!profile?.id) return [];
       
-      // Buscar empresas via user_companies (onde o usuário está vinculado)
-      const { data: userCompanies, error } = await supabase
+      // Primeiro buscar os IDs das empresas do usuário
+      const { data: userCompanies, error: ucError } = await supabase
         .from('user_companies')
-        .select('company_id, companies(id, name)')
+        .select('company_id')
         .eq('user_id', profile.id);
       
-      if (error) throw error;
+      if (ucError) throw ucError;
+      if (!userCompanies || userCompanies.length === 0) return [];
       
-      // Extrair dados das empresas
-      return userCompanies?.map(uc => uc.companies).filter(Boolean) || [];
+      const companyIds = userCompanies.map(uc => uc.company_id);
+      
+      // Depois buscar os dados das empresas
+      const { data: companiesData, error: cError } = await supabase
+        .from('companies')
+        .select('id, name')
+        .in('id', companyIds)
+        .order('name');
+      
+      if (cError) throw cError;
+      return companiesData || [];
     },
     enabled: !!profile?.id,
     staleTime: 1000 * 60 * 5, // 5 minutos
