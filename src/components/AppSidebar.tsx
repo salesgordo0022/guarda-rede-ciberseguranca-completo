@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   Settings,
@@ -54,25 +54,25 @@ export function AppSidebar() {
     queryKey: ['user-companies', profile?.id],
     queryFn: async () => {
       if (!profile?.id) return [];
-      
+
       // Primeiro buscar os IDs das empresas do usuário
       const { data: userCompanies, error: ucError } = await supabase
         .from('user_companies')
         .select('company_id')
         .eq('user_id', profile.id);
-      
+
       if (ucError) throw ucError;
       if (!userCompanies || userCompanies.length === 0) return [];
-      
+
       const companyIds = userCompanies.map(uc => uc.company_id);
-      
+
       // Depois buscar os dados das empresas
       const { data: companiesData, error: cError } = await supabase
         .from('companies')
         .select('id, name')
         .in('id', companyIds)
         .order('name');
-      
+
       if (cError) throw cError;
       return companiesData || [];
     },
@@ -80,45 +80,36 @@ export function AppSidebar() {
     staleTime: 1000 * 60 * 5, // 5 minutos
   });
 
-  // Buscar departamentos da empresa selecionada - filtrado por acesso do usuário
+  // Se a empresa selecionada não existir mais na lista do usuário, corrigir automaticamente
+  useEffect(() => {
+    if (!profile?.id) return;
+    if (companies.length === 0) return;
+
+    const hasSelected = !!selectedCompanyId;
+    const selectedIsValid = hasSelected && companies.some(c => c.id === selectedCompanyId);
+
+    if (!hasSelected || !selectedIsValid) {
+      void setSelectedCompanyId(companies[0].id);
+    }
+  }, [companies, profile?.id, selectedCompanyId, setSelectedCompanyId]);
+
+  // Buscar departamentos da empresa selecionada
+  // (conforme definição: gestor e colaborador veem todos os departamentos da empresa)
   const { data: departments } = useQuery({
-    queryKey: ['departments', selectedCompanyId, profile?.id, profile?.role],
+    queryKey: ['departments', selectedCompanyId],
     queryFn: async () => {
-      if (!selectedCompanyId || !profile?.id) return [];
-
-      // Admin vê todos os departamentos da empresa
-      if (profile.role === 'admin') {
-        const { data, error } = await supabase
-          .from('departments')
-          .select('*')
-          .eq('company_id', selectedCompanyId);
-
-        if (error) throw error;
-        return data;
-      }
-
-      // Colaborador/Gestor vê apenas departamentos aos quais tem acesso
-      const { data: userDepts, error: userDeptsError } = await supabase
-        .from('user_departments')
-        .select('department_id')
-        .eq('user_id', profile.id);
-
-      if (userDeptsError) throw userDeptsError;
-
-      const userDeptIds = userDepts?.map(ud => ud.department_id) || [];
-
-      if (userDeptIds.length === 0) return [];
+      if (!selectedCompanyId) return [];
 
       const { data, error } = await supabase
         .from('departments')
         .select('*')
         .eq('company_id', selectedCompanyId)
-        .in('id', userDeptIds);
+        .order('name');
 
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId && !!profile?.id,
+    enabled: !!selectedCompanyId,
     staleTime: 1000 * 60 * 5, // 5 minutos
   });
 

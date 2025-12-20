@@ -283,17 +283,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isColaborador = authState.profile?.role === 'colaborador';
 
   const setSelectedCompanyId = async (id: string | null) => {
-    if (!authState.user || id === authState.selectedCompanyId) return;
+    if (!authState.user) return;
 
-    // Persistir seleção (mesmo se a aba recarregar, o usuário volta para a empresa correta)
-    writeStoredCompanyId(authState.user.id, id);
+    // Permite limpar seleção (caso necessário)
+    if (!id) {
+      writeStoredCompanyId(authState.user.id, null);
+      setAuthState(prev => ({
+        ...prev,
+        selectedCompanyId: null,
+        profile: prev.profile ? { ...prev.profile, company_id: null } : prev.profile,
+      }));
+      return;
+    }
 
-    setAuthState(prev => ({ ...prev, selectedCompanyId: id, companyLoading: true }));
+    if (id === authState.selectedCompanyId) return;
 
-    // Rebusca o perfil com a role da nova empresa
-    const { profile } = await fetchProfile(authState.user.id, id);
+    setAuthState(prev => ({ ...prev, companyLoading: true }));
+
+    // Rebusca o perfil com a role da empresa selecionada (e garante que a empresa é válida)
+    const { profile, companyId: resolvedCompanyId } = await fetchProfile(authState.user.id, id);
+
+    // Persistir a empresa resolvida (evita mismatch entre empresa selecionada e role)
+    writeStoredCompanyId(authState.user.id, resolvedCompanyId);
+
     setAuthState(prev => ({
       ...prev,
+      selectedCompanyId: resolvedCompanyId,
       profile,
       companyLoading: false,
     }));
@@ -307,23 +322,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isGestor,
       isColaborador,
        refetchProfile: async (companyId?: string | null) => {
-         if (authState.user) {
-           setAuthState(prev => ({ ...prev, companyLoading: true }));
-           // Usa a empresa informada (quando existir) para buscar a role correta
-           const targetCompanyId = companyId ?? authState.selectedCompanyId;
-           const { profile, companyId: resolvedCompanyId } = await fetchProfile(authState.user.id, targetCompanyId);
+          if (authState.user) {
+            setAuthState(prev => ({ ...prev, companyLoading: true }));
+            // Usa a empresa informada (quando existir) para buscar a role correta
+            const targetCompanyId = companyId ?? authState.selectedCompanyId;
+            const { profile, companyId: resolvedCompanyId } = await fetchProfile(authState.user.id, targetCompanyId);
 
-           // Persistir a empresa que foi resolvida/selecionada
-           writeStoredCompanyId(authState.user.id, resolvedCompanyId);
+            // Persistir a empresa que foi resolvida/selecionada
+            writeStoredCompanyId(authState.user.id, resolvedCompanyId);
 
-           setAuthState(prev => ({
-             ...prev,
-             profile,
-             selectedCompanyId: prev.selectedCompanyId || resolvedCompanyId,
-             companyLoading: false,
-           }));
-         }
-       },
+            setAuthState(prev => ({
+              ...prev,
+              profile,
+              selectedCompanyId: resolvedCompanyId,
+              companyLoading: false,
+            }));
+          }
+        },
       setSelectedCompanyId
     }}>
       {children}
