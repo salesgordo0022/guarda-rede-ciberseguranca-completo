@@ -397,7 +397,7 @@ const Activities = () => {
             />
           </div>
 
-          {(isAdmin || isGestor) && (
+          {profile?.id && (
             <Button onClick={() => setIsCreating(true)} className="bg-primary hover:bg-primary/90">
               <Plus className="h-4 w-4 mr-2" />
               Nova Atividade

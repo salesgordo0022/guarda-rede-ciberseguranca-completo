@@ -87,8 +87,8 @@ const Settings = () => {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
     const [deletingDepartment, setDeletingDepartment] = useState<Department | null>(null);
-    const { selectedCompanyId, isAdmin, isGestor } = useAuth();
-    const canManageTeam = isAdmin || isGestor; // Admin e Gestor podem gerenciar equipe e departamentos
+    const { selectedCompanyId, isAdmin } = useAuth();
+    const canManageTeam = isAdmin; // Definição: apenas Admin gerencia equipe/empresas/departamentos
 
     // Sistema de cores e tema
     const {
