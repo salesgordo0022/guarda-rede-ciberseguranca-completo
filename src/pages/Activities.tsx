@@ -55,12 +55,14 @@ const Activities = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const departmentFilterId = searchParams.get("department");
+  const activityIdFromUrl = searchParams.get("activityId");
   const { isAdmin, isGestor, selectedCompanyId, profile } = useAuth();
   const queryClient = useQueryClient();
 
   const [viewing, setViewing] = useState<any>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [hasOpenedFromUrl, setHasOpenedFromUrl] = useState(false);
 
   // Fetch departments - com staleTime para evitar refetch
   const { data: departments = [] } = useQuery({
@@ -155,6 +157,24 @@ const Activities = () => {
     enabled: !!departmentFilterId && !!selectedCompanyId,
     staleTime: 1000 * 60, // 1 minuto para atividades (dados mais dinâmicos)
   });
+
+  // Abrir atividade automaticamente se vier da URL
+  useEffect(() => {
+    if (activityIdFromUrl && allActivities.length > 0 && !hasOpenedFromUrl) {
+      const activityToOpen = allActivities.find(a => a.id === activityIdFromUrl);
+      if (activityToOpen) {
+        setViewing(activityToOpen);
+        setHasOpenedFromUrl(true);
+        // Limpar o parâmetro da URL para evitar reabrir
+        navigate(`/activities?department=${departmentFilterId}`, { replace: true });
+      }
+    }
+  }, [activityIdFromUrl, allActivities, hasOpenedFromUrl, navigate, departmentFilterId]);
+
+  // Reset flag quando mudar de departamento
+  useEffect(() => {
+    setHasOpenedFromUrl(false);
+  }, [departmentFilterId]);
 
   // Calculate metrics from all activities
   const metrics = useMemo(() => {
