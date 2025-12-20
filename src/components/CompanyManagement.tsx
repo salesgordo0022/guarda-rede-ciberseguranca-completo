@@ -557,7 +557,7 @@ export function CompanyManagement() {
                                                                         variant="ghost"
                                                                         size="sm"
                                                                         onClick={() => handleOpenEditModal(member)}
-                                                                        disabled={member.user_id === company.created_by}
+                                                                        disabled={member.user_id === company.created_by || member.user_id === user?.id}
                                                                     >
                                                                         <Pencil className="h-4 w-4" />
                                                                     </Button>
