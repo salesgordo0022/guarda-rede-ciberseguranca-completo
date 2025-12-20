@@ -1,24 +1,35 @@
 import { useState } from "react";
-import { Search, Calendar, ClipboardList } from "lucide-react";
+import { Search, Calendar, ClipboardList, Building2, Folder, AlertCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ActionButtons } from "@/components/ActionButtons";
 import { GlobalTasksPanel } from "@/components/GlobalTasksPanel";
 import { GlobalMetricsCards } from "@/components/GlobalMetricsCards";
 import { DashboardCard } from "@/components/DashboardCard";
 import { TaskChart } from "@/components/TaskChart";
-import { useGlobalMetrics } from "@/hooks/useGlobalMetrics";
+import { useGlobalMetrics, UnifiedActivity } from "@/hooks/useGlobalMetrics";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { CreateTaskDialog } from "@/components/CreateTaskDialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+type ChartCategory = 'concluidas' | 'em_andamento' | 'pendentes' | 'atrasadas' | 'total' | null;
 
 const Index = () => {
   const { selectedCompanyId, profile } = useAuth();
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
   const [date, setDate] = useState<Date | undefined>(undefined);
+  const [selectedCategory, setSelectedCategory] = useState<ChartCategory>(null);
+  const [filteredActivities, setFilteredActivities] = useState<UnifiedActivity[]>([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
-  const { metrics } = useGlobalMetrics();
+  const { metrics, activities } = useGlobalMetrics();
 
   // Fetch profiles - com staleTime para evitar refetch desnecessário
   const { data: profiles = [] } = useQuery({
@@ -76,6 +87,98 @@ const Index = () => {
     { name: 'Concluídas', value: metrics.completed },
     { name: 'Atrasadas', value: metrics.overdue },
   ] : [];
+
+  const getStatusLabel = (status: string): string => {
+    const labels: Record<string, string> = {
+      'pendente': 'Pendente',
+      'em_andamento': 'Em Andamento',
+      'concluida': 'Concluída',
+      'cancelada': 'Cancelada',
+    };
+    return labels[status] || status;
+  };
+
+  const getStatusBadge = (status: string) => {
+    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+      'pendente': 'outline',
+      'em_andamento': 'secondary',
+      'concluida': 'default',
+      'cancelada': 'destructive',
+    };
+    return (
+      <Badge variant={variants[status] || 'outline'}>
+        {getStatusLabel(status)}
+      </Badge>
+    );
+  };
+
+  const getCategoryTitle = (category: ChartCategory): string => {
+    const titles: Record<string, string> = {
+      'concluidas': 'Atividades Concluídas',
+      'em_andamento': 'Atividades Em Andamento',
+      'pendentes': 'Atividades Pendentes',
+      'atrasadas': 'Atividades Atrasadas',
+      'total': 'Todas as Atividades',
+    };
+    return titles[category || ''] || 'Atividades';
+  };
+
+  const handlePieChartClick = (data: any) => {
+    if (!data?.name) return;
+    
+    const categoryMap: Record<string, ChartCategory> = {
+      'Concluídas': 'concluidas',
+      'Em andamento': 'em_andamento',
+      'Pendentes': 'pendentes',
+      'Atrasadas': 'atrasadas',
+    };
+    
+    const category = categoryMap[data.name];
+    if (!category) return;
+    
+    let filtered: UnifiedActivity[] = [];
+    
+    if (category === 'concluidas') {
+      filtered = activities.filter(a => a.status === 'concluida');
+    } else if (category === 'em_andamento') {
+      filtered = activities.filter(a => a.status === 'em_andamento');
+    } else if (category === 'pendentes') {
+      filtered = activities.filter(a => a.status === 'pendente');
+    } else if (category === 'atrasadas') {
+      filtered = activities.filter(a => a.deadline_status === 'fora_do_prazo');
+    }
+    
+    setSelectedCategory(category);
+    setFilteredActivities(filtered);
+    setDialogOpen(true);
+  };
+
+  const handleBarChartClick = (data: any) => {
+    if (!data?.name) return;
+    
+    const categoryMap: Record<string, ChartCategory> = {
+      'Total': 'total',
+      'Concluídas': 'concluidas',
+      'Atrasadas': 'atrasadas',
+    };
+    
+    const category = categoryMap[data.name];
+    if (!category) return;
+    
+    let filtered: UnifiedActivity[] = [];
+    
+    if (category === 'total') {
+      filtered = activities;
+    } else if (category === 'concluidas') {
+      filtered = activities.filter(a => a.status === 'concluida');
+    } else if (category === 'atrasadas') {
+      filtered = activities.filter(a => a.deadline_status === 'fora_do_prazo');
+    }
+    
+    setSelectedCategory(category);
+    setFilteredActivities(filtered);
+    setDialogOpen(true);
+  };
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
@@ -137,6 +240,7 @@ const Index = () => {
           title="Distribuição de Atividades"
           description="Atividades por status (Projetos + Departamentos)"
           data={statusChartData}
+          onClick={handlePieChartClick}
         />
 
         <TaskChart
@@ -144,6 +248,7 @@ const Index = () => {
           title="Comparativo Geral"
           description="Visão geral das atividades"
           data={comparisonChartData}
+          onClick={handleBarChartClick}
         />
       </div>
 
@@ -195,6 +300,62 @@ const Index = () => {
         profiles={profiles}
         projects={projects}
       />
+
+      {/* Dialog para exibir lista de atividades filtradas */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>{getCategoryTitle(selectedCategory)}</DialogTitle>
+            <DialogDescription>
+              {filteredActivities.length} atividade{filteredActivities.length !== 1 ? 's' : ''} encontrada{filteredActivities.length !== 1 ? 's' : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-[60vh]">
+            {filteredActivities.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                <AlertCircle className="h-12 w-12 mb-4" />
+                <p>Nenhuma atividade encontrada nesta categoria.</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Origem</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Prazo</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredActivities.map((activity) => (
+                    <TableRow key={activity.id}>
+                      <TableCell className="font-medium">{activity.name}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {activity.type === 'project' ? (
+                            <><Folder className="h-4 w-4 text-blue-500" /> Projeto</>
+                          ) : (
+                            <><Building2 className="h-4 w-4 text-purple-500" /> Departamento</>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{activity.source_name}</TableCell>
+                      <TableCell>{getStatusBadge(activity.status)}</TableCell>
+                      <TableCell>
+                        {activity.deadline 
+                          ? format(new Date(activity.deadline), "dd/MM/yyyy", { locale: ptBR })
+                          : <span className="text-muted-foreground">-</span>
+                        }
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
