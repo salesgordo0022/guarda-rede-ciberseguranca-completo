@@ -106,7 +106,7 @@ const roleBadgeColors: Record<AppRole, string> = {
 };
 
 export function CompanyManagement() {
-    const { user, selectedCompanyId, isAdmin } = useAuth();
+    const { user, profile, selectedCompanyId, isAdmin } = useAuth();
     const queryClient = useQueryClient();
     const { showLoading, hideLoading } = useLoading();
     const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
@@ -119,11 +119,11 @@ export function CompanyManagement() {
     const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
     const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
 
-    // Buscar todas as empresas que o usuário tem acesso
+    // Buscar todas as empresas que o usuário tem acesso (com suas roles)
     const { data: companies, isLoading: loadingCompanies } = useQuery({
-        queryKey: ["user-companies", user?.id],
+        queryKey: ["user-companies-management", profile?.id],
         queryFn: async () => {
-            if (!user?.id) return [];
+            if (!profile?.id) return [];
 
             const { data, error } = await supabase
                 .from("user_companies")
@@ -140,7 +140,7 @@ export function CompanyManagement() {
                         created_at
                     )
                 `)
-                .eq("user_id", user.id);
+                .eq("user_id", profile.id);
 
             if (error) throw error;
 
@@ -149,7 +149,8 @@ export function CompanyManagement() {
                 userRole: item.role as AppRole,
             })) || [];
         },
-        enabled: !!user?.id,
+        enabled: !!profile?.id,
+        staleTime: 0, // Sempre busca dados frescos
     });
 
     // Buscar membros de uma empresa específica
