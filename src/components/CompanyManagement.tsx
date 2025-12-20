@@ -392,8 +392,6 @@ export function CompanyManagement() {
 
     const getUserRoleInCompany = (companyId: string) => {
         const company = companies?.find(c => c.id === companyId);
-        // Se o usuário for o criador da empresa, ele deve ter permissão total
-        if (company?.created_by && company.created_by === user?.id) return "admin" as AppRole;
         return company?.userRole;
     };
 
