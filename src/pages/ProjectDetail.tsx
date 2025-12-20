@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Plus, Search, ArrowLeft, User, Users, Check } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,6 +49,8 @@ interface ProjectActivity {
 const ProjectDetail = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const activityIdFromUrl = searchParams.get("activityId");
   const { profile, isAdmin, isGestor, selectedCompanyId } = useAuth();
   const queryClient = useQueryClient();
   const [selectedActivity, setSelectedActivity] = useState<any>(null);
@@ -56,6 +58,7 @@ const ProjectDetail = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("activities");
+  const [hasOpenedFromUrl, setHasOpenedFromUrl] = useState(false);
   // Fetch project
   const { data: project, isLoading: isProjectLoading, error: projectError } = useQuery({
     queryKey: ["project", projectId],
@@ -264,6 +267,24 @@ const ProjectDetail = () => {
     enabled: !!projectId,
   });
 
+  // Abrir atividade automaticamente se vier da URL
+  useEffect(() => {
+    if (activityIdFromUrl && activities.length > 0 && !hasOpenedFromUrl) {
+      const activityToOpen = activities.find(a => a.id === activityIdFromUrl);
+      if (activityToOpen) {
+        setViewingActivity(activityToOpen);
+        setHasOpenedFromUrl(true);
+        // Limpar o parâmetro da URL para evitar reabrir
+        navigate(`/projects/${projectId}`, { replace: true });
+      }
+    }
+  }, [activityIdFromUrl, activities, hasOpenedFromUrl, navigate, projectId]);
+
+  // Reset flag quando mudar de projeto
+  useEffect(() => {
+    setHasOpenedFromUrl(false);
+  }, [projectId]);
+
   // Filter activities based on search query AND exclude completed ones
   const filteredActivities = activities.filter(activity =>
     activity.status !== 'concluida' && (
@@ -271,7 +292,6 @@ const ProjectDetail = () => {
       (activity.description && activity.description.toLowerCase().includes(searchQuery.toLowerCase()))
     )
   );
-
 
 
   const handleUpdateActivityStatus = async (id: string, status: ActivityStatus) => {

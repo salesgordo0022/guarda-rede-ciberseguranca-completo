@@ -1,8 +1,9 @@
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { ChevronDown, Building2, FolderKanban } from "lucide-react";
+import { ChevronDown, Building2, FolderKanban, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { useGlobalMetrics, UnifiedActivity } from "@/hooks/useGlobalMetrics";
+import { useNavigate } from "react-router-dom";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Database } from "@/integrations/supabase/types";
 
 interface GroupStats {
@@ -79,6 +81,7 @@ const getStatusLabel = (status: string) => {
 
 export function GlobalTasksPanel() {
   const { activities } = useGlobalMetrics();
+  const navigate = useNavigate();
   const [expandedProjects, setExpandedProjects] = useState(true);
   const [expandedDepartments, setExpandedDepartments] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<{
@@ -87,6 +90,18 @@ export function GlobalTasksPanel() {
     type: 'project' | 'department';
     activities: UnifiedActivity[];
   } | null>(null);
+
+  const handleActivityClick = (activity: UnifiedActivity) => {
+    // Fechar o dialog primeiro
+    setSelectedCategory(null);
+    
+    // Navegar para a página correspondente
+    if (activity.type === 'department') {
+      navigate(`/activities?department=${activity.source_id}&activityId=${activity.id}`);
+    } else {
+      navigate(`/projects/${activity.source_id}?activityId=${activity.id}`);
+    }
+  };
 
   // Agrupar por fonte (projeto ou departamento)
   const getGroupStats = (): { projects: GroupStats[]; departments: GroupStats[] } => {
@@ -309,18 +324,23 @@ export function GlobalTasksPanel() {
                 <TableHead>Prazo</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Origem</TableHead>
+                <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {selectedCategory?.activities.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground">
                     Nenhuma atividade encontrada
                   </TableCell>
                 </TableRow>
               ) : (
                 selectedCategory?.activities.map((activity) => (
-                  <TableRow key={activity.id}>
+                  <TableRow 
+                    key={activity.id}
+                    className="cursor-pointer hover:bg-muted/80 transition-colors"
+                    onClick={() => handleActivityClick(activity)}
+                  >
                     <TableCell>
                       <Badge variant={activity.type === 'project' ? 'default' : 'secondary'} className="text-xs">
                         {activity.type === 'project' ? 'Projeto' : 'Departamento'}
@@ -336,6 +356,16 @@ export function GlobalTasksPanel() {
                       <Badge variant="outline">{getStatusLabel(activity.status)}</Badge>
                     </TableCell>
                     <TableCell>{activity.source_name}</TableCell>
+                    <TableCell>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <ExternalLink className="h-4 w-4 text-muted-foreground hover:text-primary transition-colors" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Ver detalhes</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TableCell>
                   </TableRow>
                 ))
               )}

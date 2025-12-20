@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Search, Calendar, ClipboardList, Building2, Folder, AlertCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Search, Calendar, ClipboardList, Building2, Folder, AlertCircle, ExternalLink } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ActionButtons } from "@/components/ActionButtons";
 import { GlobalTasksPanel } from "@/components/GlobalTasksPanel";
@@ -23,6 +24,7 @@ type ChartCategory = 'concluidas' | 'em_andamento' | 'pendentes' | 'atrasadas' |
 
 const Index = () => {
   const { selectedCompanyId, profile } = useAuth();
+  const navigate = useNavigate();
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [selectedCategory, setSelectedCategory] = useState<ChartCategory>(null);
@@ -30,6 +32,15 @@ const Index = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const { metrics, activities } = useGlobalMetrics();
+
+  const handleActivityClick = (activity: UnifiedActivity) => {
+    setDialogOpen(false);
+    if (activity.type === 'department') {
+      navigate(`/activities?department=${activity.source_id}&activityId=${activity.id}`);
+    } else {
+      navigate(`/projects/${activity.source_id}?activityId=${activity.id}`);
+    }
+  };
 
   // Fetch profiles - com staleTime para evitar refetch desnecessário
   const { data: profiles = [] } = useQuery({
@@ -325,11 +336,16 @@ const Index = () => {
                     <TableHead>Origem</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Prazo</TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredActivities.map((activity) => (
-                    <TableRow key={activity.id}>
+                    <TableRow 
+                      key={activity.id}
+                      className="cursor-pointer hover:bg-muted/80 transition-colors"
+                      onClick={() => handleActivityClick(activity)}
+                    >
                       <TableCell className="font-medium">{activity.name}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -347,6 +363,9 @@ const Index = () => {
                           ? format(new Date(activity.deadline), "dd/MM/yyyy", { locale: ptBR })
                           : <span className="text-muted-foreground">-</span>
                         }
+                      </TableCell>
+                      <TableCell>
+                        <ExternalLink className="h-4 w-4 text-muted-foreground hover:text-primary transition-colors" />
                       </TableCell>
                     </TableRow>
                   ))}
