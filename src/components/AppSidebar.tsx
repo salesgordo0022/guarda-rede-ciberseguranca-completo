@@ -49,15 +49,24 @@ export function AppSidebar() {
   const [newCompanyName, setNewCompanyName] = useState("");
   const [isCreatingCompany, setIsCreatingCompany] = useState(false);
 
-  // Buscar empresas disponíveis - com staleTime para evitar refetch
+  // Buscar apenas empresas às quais o usuário pertence
   const { data: companies = [] } = useQuery({
-    queryKey: ['companies'],
+    queryKey: ['user-companies', profile?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('companies').select('id, name');
+      if (!profile?.id) return [];
+      
+      // Buscar empresas via user_companies (onde o usuário está vinculado)
+      const { data: userCompanies, error } = await supabase
+        .from('user_companies')
+        .select('company_id, companies(id, name)')
+        .eq('user_id', profile.id);
+      
       if (error) throw error;
-      return data;
+      
+      // Extrair dados das empresas
+      return userCompanies?.map(uc => uc.companies).filter(Boolean) || [];
     },
-    enabled: !!profile,
+    enabled: !!profile?.id,
     staleTime: 1000 * 60 * 5, // 5 minutos
   });
 
