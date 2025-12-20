@@ -13,6 +13,9 @@ import { useSystemSettings, SystemSettingsProvider } from "@/hooks/useSystemSett
 import { useAuth, AuthProvider } from "@/hooks/useAuth";
 import { LoadingProvider } from "@/contexts/LoadingContext";
 
+// Import loading GIF
+import loadingPikachu from "@/assets/loading-pikachu.gif";
+
 // Importações de páginas da aplicação
 import Index from "./pages/Index";
 import Tasks from "./pages/Tasks";
@@ -104,11 +107,12 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
-        <div className="relative">
-          <div className="h-16 w-16 rounded-full border-4 border-primary/20 animate-pulse" />
-          <div className="absolute inset-0 h-16 w-16 rounded-full border-4 border-transparent border-t-primary animate-spin" />
-        </div>
-        <p className="text-muted-foreground animate-pulse">Carregando...</p>
+        <img 
+          src={loadingPikachu} 
+          alt="Carregando" 
+          className="w-32 h-32 object-contain"
+        />
+        <p className="text-lg font-medium text-foreground animate-pulse">Carregando...</p>
       </div>
     );
   }
@@ -122,18 +126,12 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   if (companyLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
-        <div className="relative">
-          <div className="h-16 w-16 rounded-full border-4 border-primary/20" />
-          <div className="absolute inset-0 h-16 w-16 rounded-full border-4 border-transparent border-t-primary animate-spin" />
-        </div>
-        <div className="flex flex-col items-center gap-2">
-          <p className="text-muted-foreground">Carregando empresa...</p>
-          <div className="flex gap-1">
-            <span className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "0ms" }} />
-            <span className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "150ms" }} />
-            <span className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "300ms" }} />
-          </div>
-        </div>
+        <img 
+          src={loadingPikachu} 
+          alt="Carregando" 
+          className="w-32 h-32 object-contain"
+        />
+        <p className="text-lg font-medium text-foreground animate-pulse">Carregando empresa...</p>
       </div>
     );
   }
