@@ -508,6 +508,10 @@ export function ActivityDetailsSheet({
                 if (initialActivity?.status !== 'concluida' && formData.status === 'concluida' && selectedCompanyId) {
                     const deadlineStatus = updatedActivity?.deadline_status;
                     
+                    console.log('Gamificação - deadline_status:', deadlineStatus);
+                    console.log('Gamificação - selectedAssignees:', selectedAssignees);
+                    console.log('Gamificação - profile?.id:', profile?.id);
+                    
                     // Determinar pontos baseado no deadline_status
                     // bateu_meta = 10 pontos, concluido_no_prazo = 5 pontos
                     let points = 0;
@@ -520,16 +524,33 @@ export function ActivityDetailsSheet({
                         points = 5;
                     }
                     
-                    // Dar pontos para todos os assignees
-                    if (points > 0 && selectedAssignees.length > 0) {
-                        for (const userId of selectedAssignees) {
+                    console.log('Gamificação - pontos calculados:', points, 'isBeatGoal:', isBeatGoal);
+                    
+                    // Determinar quem recebe os pontos
+                    // Se há assignees, dar para eles; senão, dar para quem concluiu
+                    const usersToScore = selectedAssignees.length > 0 
+                        ? selectedAssignees 
+                        : (profile?.id ? [profile.id] : []);
+                    
+                    console.log('Gamificação - usuários que receberão pontos:', usersToScore);
+                    
+                    // Dar pontos
+                    if (points > 0 && usersToScore.length > 0) {
+                        for (const userId of usersToScore) {
                             try {
-                                await supabase.rpc('add_user_score', {
+                                console.log('Chamando add_user_score para:', userId, 'pontos:', points);
+                                const { error: scoreError } = await supabase.rpc('add_user_score', {
                                     _user_id: userId,
                                     _company_id: selectedCompanyId,
                                     _points: points,
                                     _is_beat_goal: isBeatGoal
                                 });
+                                if (scoreError) {
+                                    console.error('Erro RPC add_user_score:', scoreError);
+                                } else {
+                                    console.log('Score adicionado com sucesso para:', userId);
+                                    toast.success(`+${points} pontos! ${isBeatGoal ? '🏆 Bateu a meta!' : '✅ No prazo!'}`);
+                                }
                             } catch (e) {
                                 console.error('Erro ao adicionar score:', e);
                             }
