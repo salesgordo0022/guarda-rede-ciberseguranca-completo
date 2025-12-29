@@ -93,23 +93,47 @@ export function AppSidebar() {
     }
   }, [companies, profile?.id, selectedCompanyId, setSelectedCompanyId]);
 
-  // Buscar departamentos da empresa selecionada
-  // (conforme definição: gestor e colaborador veem todos os departamentos da empresa)
+  // Buscar departamentos do usuário na empresa selecionada
+  // Admins veem todos os departamentos, gestores/colaboradores veem apenas os seus
   const { data: departments } = useQuery({
-    queryKey: ['departments', selectedCompanyId],
+    queryKey: ['user-departments', selectedCompanyId, profile?.id, isAdmin],
     queryFn: async () => {
-      if (!selectedCompanyId) return [];
+      if (!selectedCompanyId || !profile?.id) return [];
+
+      // Se for admin, busca todos os departamentos da empresa
+      if (isAdmin) {
+        const { data, error } = await supabase
+          .from('departments')
+          .select('*')
+          .eq('company_id', selectedCompanyId)
+          .order('name');
+
+        if (error) throw error;
+        return data;
+      }
+
+      // Para gestor/colaborador, buscar apenas os departamentos vinculados ao usuário
+      const { data: userDepts, error: udError } = await supabase
+        .from('user_departments')
+        .select('department_id')
+        .eq('user_id', profile.id);
+
+      if (udError) throw udError;
+      if (!userDepts || userDepts.length === 0) return [];
+
+      const deptIds = userDepts.map(ud => ud.department_id);
 
       const { data, error } = await supabase
         .from('departments')
         .select('*')
         .eq('company_id', selectedCompanyId)
+        .in('id', deptIds)
         .order('name');
 
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!selectedCompanyId && !!profile?.id,
     staleTime: 1000 * 60 * 5, // 5 minutos
   });
 
