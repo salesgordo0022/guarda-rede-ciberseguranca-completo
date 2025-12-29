@@ -155,24 +155,14 @@ const Auth = () => {
 
             <div className="flex flex-col gap-2">
               {mode === 'login' && (
-                <>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="w-full"
-                    onClick={() => setMode('signup')}
-                  >
-                    Não tem conta? Cadastre-se
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="link"
-                    className="w-full text-muted-foreground"
-                    onClick={() => setMode('reset')}
-                  >
-                    Esqueci minha senha
-                  </Button>
-                </>
+                <Button
+                  type="button"
+                  variant="link"
+                  className="w-full text-muted-foreground"
+                  onClick={() => setMode('reset')}
+                >
+                  Esqueci minha senha
+                </Button>
               )}
               
               {mode === 'signup' && (
