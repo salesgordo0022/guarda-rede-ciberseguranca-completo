@@ -24,13 +24,27 @@ export interface GlobalMetrics {
 }
 
 export function useGlobalMetrics() {
-  const { selectedCompanyId, profile } = useAuth();
+  const { selectedCompanyId, profile, isAdmin } = useAuth();
 
   // Buscar todas as atividades (projetos + departamentos)
+  // Filtrado pelos departamentos do usuário (exceto admins que veem tudo)
   const { data, isLoading } = useQuery({
-    queryKey: ['global-activities', selectedCompanyId],
+    queryKey: ['global-activities', selectedCompanyId, profile?.id, isAdmin],
     queryFn: async () => {
-      if (!selectedCompanyId) return { activities: [], metrics: null };
+      if (!selectedCompanyId || !profile?.id) return { activities: [], metrics: null };
+
+      // Buscar departamentos do usuário (para filtrar atividades)
+      let userDeptIds: string[] = [];
+      
+      if (!isAdmin) {
+        const { data: userDepts, error: udError } = await supabase
+          .from('user_departments')
+          .select('department_id')
+          .eq('user_id', profile.id);
+
+        if (udError) throw udError;
+        userDeptIds = (userDepts || []).map(ud => ud.department_id);
+      }
 
       // Buscar atividades de projetos (filtrando por empresa no backend)
       const { data: projectActivities, error: paError } = await supabase
@@ -45,8 +59,8 @@ export function useGlobalMetrics() {
 
       if (paError) throw paError;
 
-      // Buscar atividades de departamentos (filtrando por empresa no backend)
-      const { data: deptActivities, error: daError } = await supabase
+      // Buscar atividades de departamentos (filtrando por empresa e departamentos do usuário)
+      let deptActivitiesQuery = supabase
         .from('department_activities')
         .select(
           `
@@ -55,6 +69,16 @@ export function useGlobalMetrics() {
         `
         )
         .eq('department.company_id', selectedCompanyId);
+
+      // Se não for admin, filtrar apenas pelos departamentos do usuário
+      if (!isAdmin && userDeptIds.length > 0) {
+        deptActivitiesQuery = deptActivitiesQuery.in('department_id', userDeptIds);
+      } else if (!isAdmin && userDeptIds.length === 0) {
+        // Usuário não-admin sem departamentos não vê nenhuma atividade de departamento
+        deptActivitiesQuery = deptActivitiesQuery.in('department_id', ['00000000-0000-0000-0000-000000000000']);
+      }
+
+      const { data: deptActivities, error: daError } = await deptActivitiesQuery;
 
       if (daError) throw daError;
 
@@ -97,7 +121,7 @@ export function useGlobalMetrics() {
 
       return { activities: allActivities, metrics };
     },
-    enabled: !!selectedCompanyId && !!profile,
+    enabled: !!selectedCompanyId && !!profile?.id,
     staleTime: 1000 * 60 * 2, // 2 minutos
     refetchOnMount: true,
   });
