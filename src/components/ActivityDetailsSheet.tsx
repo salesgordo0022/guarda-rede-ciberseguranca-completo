@@ -483,14 +483,15 @@ export function ActivityDetailsSheet({
                 }
 
                 // Both project and department activities use the same data structure now
-                const { data: updatedActivity, error } = await supabase
+                const { data: updatedActivityArr, error } = await supabase
                     .from(table)
                     .update(activityData)
                     .eq('id', activityId)
-                    .select()
-                    .single();
+                    .select();
 
                 if (error) throw error;
+                
+                const updatedActivity = updatedActivityArr?.[0];
 
                 // Atualizar responsáveis (delete and re-insert)
                 const assigneesTable = isProject ? 'project_activity_assignees' : 'department_activity_assignees';
