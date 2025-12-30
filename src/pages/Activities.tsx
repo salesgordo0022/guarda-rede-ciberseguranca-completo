@@ -23,6 +23,11 @@ interface Department {
   name: string;
 }
 
+interface ChecklistStats {
+  total: number;
+  completed: number;
+}
+
 interface DepartmentActivity {
   id: string;
   name: string;
@@ -49,6 +54,7 @@ interface DepartmentActivity {
       avatar_url?: string | null;
     } | null;
   }[];
+  checklistStats?: ChecklistStats;
 }
 
 const Activities = () => {
@@ -112,6 +118,12 @@ const Activities = () => {
 
       // Fetch assignees for all activities
       const activityIds = filteredActivities.map((a: any) => a.id);
+      
+      // Fetch checklist items for all activities
+      const { data: checklistData } = await supabase
+        .from("department_activity_checklist")
+        .select("activity_id, completed")
+        .in("activity_id", activityIds);
       const { data: assigneesData } = await supabase
         .from("department_activity_assignees")
         .select("activity_id, user_id")
@@ -130,7 +142,21 @@ const Activities = () => {
         profilesData.map(p => [p.id, p])
       );
 
-      // Attach assignees to activities
+      // Calculate checklist stats per activity
+      const checklistStatsMap = new Map<string, ChecklistStats>();
+      if (checklistData && checklistData.length > 0) {
+        activityIds.forEach(actId => {
+          const items = checklistData.filter(c => c.activity_id === actId);
+          if (items.length > 0) {
+            checklistStatsMap.set(actId, {
+              total: items.length,
+              completed: items.filter(c => c.completed).length
+            });
+          }
+        });
+      }
+
+      // Attach assignees and checklist stats to activities
       return filteredActivities.map((activity: any) => ({
         id: activity.id,
         name: activity.name,
@@ -146,6 +172,7 @@ const Activities = () => {
         created_by: activity.created_by,
         created_at: activity.created_at,
         department: activity.department,
+        checklistStats: checklistStatsMap.get(activity.id),
         assignees: (assigneesData || [])
           .filter(a => a.activity_id === activity.id)
           .map(a => ({
@@ -177,13 +204,34 @@ const Activities = () => {
   }, [departmentFilterId]);
 
   // Calculate metrics from all activities
+  // Progress is based on checklist if available, otherwise on status
   const metrics = useMemo(() => {
     const total = allActivities.length;
     const completed = allActivities.filter(a => a.status === "concluida").length;
     const inProgress = allActivities.filter(a => a.status === "em_andamento").length;
     const pending = allActivities.filter(a => a.status === "pendente").length;
     const overdue = allActivities.filter(a => a.deadline_status === "fora_do_prazo").length;
-    const completionPercentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+    
+    // Calculate completion percentage
+    // For activities with checklist: use checklist progress
+    // For activities without checklist: use status-based progress
+    let totalProgress = 0;
+    allActivities.forEach(activity => {
+      if (activity.checklistStats && activity.checklistStats.total > 0) {
+        // Has checklist - calculate percentage from checklist items
+        totalProgress += (activity.checklistStats.completed / activity.checklistStats.total) * 100;
+      } else {
+        // No checklist - use status
+        if (activity.status === "concluida") {
+          totalProgress += 100;
+        } else if (activity.status === "em_andamento") {
+          totalProgress += 50;
+        }
+        // pendente = 0%
+      }
+    });
+    
+    const completionPercentage = total > 0 ? Math.round(totalProgress / total) : 0;
 
     return { total, completed, inProgress, pending, overdue, completionPercentage };
   }, [allActivities]);
