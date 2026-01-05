@@ -7,7 +7,7 @@ import {
   HelpCircle,
   Building2,
   Plus,
-  Rocket
+  Shield
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useNavigate } from "react-router-dom";
@@ -347,7 +347,7 @@ export function AppSidebar() {
           rel="noopener noreferrer"
           className="flex items-center gap-3 px-4 py-3 rounded-lg transition-all bg-primary/10 text-primary hover:bg-primary/20 hover-scale w-full"
         >
-          <Rocket className="h-5 w-5 flex-shrink-0" />
+          <Shield className="h-5 w-5 flex-shrink-0" />
           {open && <span className="text-[15px] font-medium">Acessos</span>}
         </a>
 
