@@ -342,13 +342,13 @@ export function AppSidebar() {
         </button>
 
         <a 
-          href="https://lovely-task-whisperer-01.lovable.app" 
+          href="https://imperialsecury.lovable.app" 
           target="_blank" 
           rel="noopener noreferrer"
           className="flex items-center gap-3 px-4 py-3 rounded-lg transition-all bg-primary/10 text-primary hover:bg-primary/20 hover-scale w-full"
         >
           <Rocket className="h-5 w-5 flex-shrink-0" />
-          {open && <span className="text-[15px] font-medium">Produtivo</span>}
+          {open && <span className="text-[15px] font-medium">Acessos</span>}
         </a>
 
         <a 
