@@ -1,4 +1,4 @@
-import { Settings as SettingsIcon, Plus, Pencil, Trash2, Building2, Palette, Check, History, Users, User, Briefcase } from "lucide-react";
+import { Settings as SettingsIcon, Plus, Pencil, Trash2, Building2, Palette, Check, History, Users, User, Briefcase, Download, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -87,8 +87,9 @@ const Settings = () => {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
     const [deletingDepartment, setDeletingDepartment] = useState<Department | null>(null);
-    const { selectedCompanyId, isAdmin } = useAuth();
-    const canManageTeam = isAdmin; // Definição: apenas Admin gerencia equipe/empresas/departamentos
+    const [isExporting, setIsExporting] = useState(false);
+    const { selectedCompanyId, isAdmin, user } = useAuth();
+    const canManageTeam = isAdmin;
 
     // Sistema de cores e tema
     const {
@@ -149,8 +150,7 @@ const Settings = () => {
         enabled: !!selectedCompanyId
     });
 
-    // Mutation para criar departamento
-    const { user } = useAuth();
+    // user já vem do useAuth acima
     
     const createDepartmentMutation = useMutation({
         mutationFn: async (values: z.infer<typeof departmentSchema>) => {
@@ -264,6 +264,34 @@ const Settings = () => {
         }
     };
 
+    const handleExportData = async () => {
+        setIsExporting(true);
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error("Não autenticado");
+
+            const { data, error } = await supabase.functions.invoke('export-data', {
+                headers: { Authorization: `Bearer ${session.access_token}` },
+            });
+
+            if (error) throw error;
+
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `notaup-export-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            toast({ title: "Exportação concluída!", description: "Seus dados foram baixados com sucesso." });
+        } catch (err: any) {
+            toast({ title: "Erro ao exportar", description: err.message, variant: "destructive" });
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     const handleEdit = (department: Department) => {
         setEditingDepartment(department);
         form.setValue("name", department.name);
@@ -314,7 +342,7 @@ const Settings = () => {
             </div>
 
             <Tabs defaultValue="profile" className="w-full">
-                <TabsList className={`grid w-full max-w-4xl ${canManageTeam ? 'grid-cols-3 md:grid-cols-6' : 'grid-cols-3'} h-auto`}>
+                <TabsList className={`grid w-full max-w-4xl ${canManageTeam ? 'grid-cols-4 md:grid-cols-7' : 'grid-cols-4'} h-auto`}>
                     <TabsTrigger value="profile" className="flex-col md:flex-row gap-1 py-2 text-xs md:text-sm">
                         <User className="h-4 w-4" />
                         <span className="hidden sm:inline">Perfil</span>
@@ -344,6 +372,10 @@ const Settings = () => {
                     <TabsTrigger value="history" className="flex-col md:flex-row gap-1 py-2 text-xs md:text-sm">
                         <History className="h-4 w-4" />
                         <span className="hidden sm:inline">Histórico</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="export" className="flex-col md:flex-row gap-1 py-2 text-xs md:text-sm">
+                        <Download className="h-4 w-4" />
+                        <span className="hidden sm:inline">Exportar</span>
                     </TabsTrigger>
                 </TabsList>
 
@@ -757,6 +789,48 @@ const Settings = () => {
                         </p>
                     </div>
                     <TaskHistoryTable />
+                </TabsContent>
+
+                {/* Tab de Exportação */}
+                <TabsContent value="export" className="space-y-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Download className="h-5 w-5" />
+                                Exportar Dados
+                            </CardTitle>
+                            <CardDescription>
+                                Baixe todos os dados do sistema em formato JSON — empresas, departamentos, projetos, atividades, equipe e notificações.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="rounded-lg border p-4 space-y-2 bg-muted/30">
+                                <p className="text-sm font-medium">O arquivo exportado incluirá:</p>
+                                <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                                    <li>Empresas e configurações</li>
+                                    <li>Departamentos</li>
+                                    <li>Projetos e atividades de projetos</li>
+                                    <li>Atividades de departamentos (com checklist e comentários)</li>
+                                    <li>Membros da equipe</li>
+                                    <li>Notificações</li>
+                                    <li>Pontuações dos usuários</li>
+                                </ul>
+                            </div>
+                            <Button onClick={handleExportData} disabled={isExporting} size="lg">
+                                {isExporting ? (
+                                    <>
+                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                        Exportando...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Download className="h-4 w-4 mr-2" />
+                                        Baixar JSON
+                                    </>
+                                )}
+                            </Button>
+                        </CardContent>
+                    </Card>
                 </TabsContent>
             </Tabs>
 
